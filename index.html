@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>HOVE OPS</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --navy:#0B2559;--navy-h:#0D2E6E;--navy-pale:#EEF2FA;
+  --bg:#F7F9FC;--white:#FFFFFF;--border:#E4E9F2;
+  --text:#0A0F1E;--t2:#5A6480;--t3:#9AA3BA;
+  --amber:#F59E0B;--red:#EF4444;--green:#10B981;
+  --red-p:#FEF2F2;--amber-p:#FFFBEB;--green-p:#ECFDF5;
+  --r:14px;--shadow:0 1px 3px rgba(11,37,89,.06),0 4px 16px rgba(11,37,89,.05)
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+#app{display:flex;min-height:100vh}
+
+/* SIDEBAR */
+#sidebar{width:220px;min-height:100vh;background:var(--white);border-right:1px solid var(--border);position:fixed;top:0;left:0;display:flex;flex-direction:column;z-index:50}
+.s-logo{padding:24px 20px 14px;border-bottom:1px solid var(--border)}
+.s-wordmark{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:var(--navy);letter-spacing:-.5px}
+.s-sub{font-size:11px;color:var(--t3);letter-spacing:1px;text-transform:uppercase;margin-top:2px}
+.s-meta{padding:10px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+#utc{font-family:'Courier New',monospace;font-size:13px;font-weight:600;color:var(--navy)}
+#dot{width:8px;height:8px;border-radius:50%;background:var(--green);transition:background .3s}
+#dot.err{background:var(--red)}
+nav{padding:12px;flex:1}
+.nb{width:100%;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:none;cursor:pointer;background:transparent;color:var(--t2);font-size:14px;font-weight:400;font-family:'DM Sans',sans-serif;text-align:left;margin-bottom:2px;transition:all .15s}
+.nb:hover{background:var(--bg);color:var(--navy)}
+.nb.on{background:var(--navy-pale);color:var(--navy);font-weight:600}
+.nb-badge{margin-left:auto;background:var(--red);color:#fff;border-radius:10px;padding:1px 6px;font-size:11px;font-weight:700;display:none}
+.s-foot{padding:14px 20px;border-top:1px solid var(--border);font-size:11px;color:var(--t3)}
+
+/* MAIN */
+#content{margin-left:220px;flex:1;padding:36px 32px 60px;min-width:0}
+
+/* BOTTOM NAV */
+#bnav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--white);border-top:1px solid var(--border);z-index:100;padding:8px 0 12px}
+.bnb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;border:none;background:transparent;color:var(--t3);cursor:pointer;padding:4px 0;font-size:10px;font-family:'DM Sans',sans-serif}
+.bnb.on{color:var(--navy);font-weight:600}
+
+/* TYPOGRAPHY */
+h1{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--navy)}
+.pg-sub{font-size:14px;color:var(--t2);margin-top:4px}
+.sec-label{font-size:12px;font-weight:600;color:var(--t2);letter-spacing:.5px;text-transform:uppercase;margin-bottom:12px;display:block}
+
+/* CARD */
+.card{background:var(--white);border-radius:var(--r);border:1px solid var(--border);padding:20px;box-shadow:var(--shadow)}
+
+/* BUTTONS */
+.btn{background:var(--navy);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .15s;white-space:nowrap}
+.btn:hover{background:var(--navy-h)}
+.btn-g{background:transparent;color:var(--t2);border:1px solid var(--border);border-radius:8px;padding:8px 16px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s}
+.btn-g:hover{border-color:var(--navy);color:var(--navy)}
+.btn-d{background:transparent;color:var(--red);border:1px solid var(--red);border-radius:8px;padding:5px 12px;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif}
+.btn-sm{padding:5px 12px;font-size:13px}
+
+/* BADGE */
+.badge{display:inline-block;border-radius:6px;padding:3px 8px;font-size:12px;font-weight:600}
+
+/* TABS */
+.tabs{display:flex;gap:4px;background:var(--navy-pale);padding:4px;border-radius:10px;width:fit-content;margin-bottom:24px}
+.tab{padding:7px 18px;border-radius:8px;border:none;cursor:pointer;font-weight:600;font-size:14px;font-family:'DM Sans',sans-serif;background:transparent;color:var(--t2);transition:all .15s}
+.tab.on{background:var(--navy);color:#fff}
+
+/* FORMS */
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--t2);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px}
+.field input,.field select,.field textarea{width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--border);font-size:14px;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;outline:none;transition:border-color .15s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--navy)}
+.field textarea{min-height:80px;resize:vertical}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* MODAL */
+#overlay{display:none;position:fixed;inset:0;background:rgba(10,15,30,.5);z-index:1000;align-items:center;justify-content:center;padding:16px}
+#overlay.open{display:flex}
+#modal{background:var(--white);border-radius:var(--r);border:1px solid var(--border);width:100%;max-width:520px;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:var(--shadow)}
+.m-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.m-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;color:var(--navy)}
+.m-close{background:none;border:none;font-size:24px;cursor:pointer;color:var(--t2);line-height:1}
+.m-foot{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:28px}
+.stat{background:var(--white);border-radius:var(--r);border:1px solid var(--border);padding:18px 16px;box-shadow:var(--shadow)}
+.stat-v{font-family:'Syne',sans-serif;font-size:32px;font-weight:800}
+.stat-l{font-size:12px;color:var(--t2);margin-top:4px}
+
+/* LIST ITEMS */
+.li{background:var(--white);border-radius:var(--r);border:1px solid var(--border);padding:16px 20px;margin-bottom:10px;box-shadow:var(--shadow);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.li-title{font-family:'Syne',sans-serif;font-weight:700;font-size:17px;color:var(--navy);margin-bottom:4px}
+.li-sub{font-size:13px;color:var(--t2)}
+.li-actions{display:flex;gap:8px;align-items:center}
+
+/* ALERTS */
+.alert-li{padding:12px 16px;background:var(--white);border-radius:var(--r);border:1px solid var(--border);box-shadow:var(--shadow);display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px}
+.alert-li.red{border-left:3px solid var(--red)}
+.alert-li.amber{border-left:3px solid var(--amber)}
+.alert-li.navy{border-left:3px solid var(--navy)}
+
+/* CREW */
+.crew-card{background:var(--white);border-radius:var(--r);border:1px solid var(--border);padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+.crew-h{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+.crew-div{border-top:1px solid var(--border);padding-top:14px}
+.lic-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:10px}
+.lic{border-radius:10px;padding:10px 12px}
+.lic-n{font-weight:700;font-size:14px}
+.lic-d{font-size:12px;color:var(--t2);margin-top:2px}
+.lic-s{font-size:11px;font-weight:600;margin-top:2px}
+.lic-a{display:flex;gap:6px;margin-top:8px}
+.lic-btn{font-size:11px;background:rgba(255,255,255,.7);border:1px solid rgba(0,0,0,.1);border-radius:5px;padding:2px 8px;cursor:pointer;font-family:'DM Sans',sans-serif}
+
+/* SIGN */
+.sign-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.sign-chip{border-radius:8px;padding:8px 14px;display:flex;align-items:center;gap:8px}
+.sign-btn{font-size:11px;background:var(--navy);color:#fff;border:none;border-radius:5px;padding:3px 10px;cursor:pointer;font-family:'DM Sans',sans-serif}
+
+/* MISC */
+.empty{text-align:center;padding:48px 20px;color:var(--t3);font-size:14px}
+.spinner-w{display:flex;justify-content:center;padding:60px}
+.spinner{width:32px;height:32px;border:3px solid var(--navy-pale);border-top-color:var(--navy);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ph{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;flex-wrap:wrap;gap:12px}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  #sidebar{display:none}
+  #bnav{display:flex}
+  #content{margin-left:0;padding:20px 16px 90px}
+  h1{font-size:22px}
+  .g2{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+
+/* CALENDAR */
+.cal-month-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.cal-month-title{font-family:"Syne",sans-serif;font-size:20px;font-weight:800;color:var(--navy)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:24px}
+.cal-dow{background:var(--navy-pale);text-align:center;padding:8px 4px;font-size:11px;font-weight:600;color:var(--t2);letter-spacing:.5px;text-transform:uppercase;border-bottom:1px solid var(--border)}
+.cal-cell{background:var(--white);min-height:80px;padding:6px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;vertical-align:top}
+.cal-cell:nth-child(7n){border-right:none}
+.cal-cell:hover{background:var(--navy-pale)}
+.cal-cell.other{background:#FAFBFD}
+.cal-cell.other .cal-day-num{color:var(--t3)}
+.cal-cell.today .cal-day-num{background:var(--navy);color:#fff;border-radius:50%}
+.cal-cell.selected{background:#E8EFF9}
+.cal-day-num{font-size:13px;font-weight:600;color:var(--navy);width:22px;height:22px;display:flex;align-items:center;justify-content:center;margin-bottom:4px}
+.cal-pills{display:flex;flex-direction:column;gap:2px}
+.cal-pill{border-radius:4px;padding:2px 5px;font-size:10px;font-weight:600;display:flex;align-items:center;gap:3px;overflow:hidden;white-space:nowrap;max-width:100%}
+.cal-pill span{overflow:hidden;text-overflow:ellipsis}
+.cal-pill.vol{background:#DBEAFE;color:#1E40AF}
+.cal-pill.sim{background:#EDE9FE;color:#5B21B6}
+.cal-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.cal-dot.vol{background:#2563EB}
+.cal-dot.sim{background:#7C3AED}
+.cal-dots{display:flex;gap:3px;margin-top:3px}
+.cal-legend{display:flex;gap:16px;margin-bottom:16px}
+.cal-legend-item{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--t2)}
+.cal-legend-dot{width:10px;height:10px;border-radius:50%}
+.cal-day-detail{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:20px;box-shadow:var(--shadow)}
+.cal-day-detail-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+.cal-event{border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-left:4px solid transparent}
+.cal-event.vol{background:#EFF6FF;border-left-color:#2563EB}
+.cal-event.sim{background:#F5F3FF;border-left-color:#7C3AED}
+.cal-event-kind{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px}
+.cal-event-kind.vol{color:#2563EB}
+.cal-event-kind.sim{color:#7C3AED}
+.cal-event-title{font-family:"Syne",sans-serif;font-weight:700;font-size:16px;color:var(--navy);margin-bottom:3px}
+.cal-event-sub{font-size:13px;color:var(--t2);margin-top:2px}
+.cal-event-time{font-weight:700;font-size:15px;color:var(--navy);text-align:right;white-space:nowrap}
+.cal-event-time-sub{font-size:12px;color:var(--t2);text-align:right;margin-top:2px}
+@media(max-width:768px){.cal-cell{min-height:50px;padding:4px}.cal-pills{display:none}.cal-dots{display:flex}}
+@media(min-width:769px){.cal-dots{display:none}}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <div class="s-logo">
+      <div class="s-wordmark">HOVE OPS</div>
+      <div class="s-sub">Operations</div>
+    </div>
+    <div class="s-meta">
+      <span id="utc">--:-- UTC</span>
+      <span id="dot"></span>
+    </div>
+    <nav id="snav"></nav>
+    <div class="s-foot">v2.0 · HOVE Aviation</div>
+  </aside>
+
+  <!-- CONTENT -->
+  <main id="content">
+    <div class="spinner-w"><div class="spinner"></div></div>
+  </main>
+
+  <!-- BOTTOM NAV -->
+  <nav id="bnav"></nav>
+</div>
+
+<!-- MODAL -->
+<div id="overlay" onclick="if(event.target===this)closeModal()">
+  <div id="modal">
+    <div class="m-head">
+      <span class="m-title" id="m-title"></span>
+      <button class="m-close" onclick="closeModal()">×</button>
+    </div>
+    <div id="m-body"></div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   CONFIG SUPABASE
+═══════════════════════════════════════════ */
+const SB = 'https://rjwtzwoojfsvpdopmocv.supabase.co';
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJqd3R6d29vamZzdnBkb3Btb2N2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMDk3NzAsImV4cCI6MjA5MDg4NTc3MH0.pr2pCDA57woTwl0EkP41jUHwmuDfgyUfa046HF3yg1E';
+const H = { 'apikey': KEY, 'Authorization': `Bearer ${KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+
+const db = {
+  get: (t, q='') => fetch(`${SB}/rest/v1/${t}?${q}`, {headers: H}).then(r => r.json()),
+  post: (t, d) => fetch(`${SB}/rest/v1/${t}`, {method:'POST', headers: H, body: JSON.stringify(d)}).then(r => r.json()),
+  patch: (t, id, d) => fetch(`${SB}/rest/v1/${t}?id=eq.${id}`, {method:'PATCH', headers: H, body: JSON.stringify(d)}).then(r => r.json()),
+  del: (t, id) => fetch(`${SB}/rest/v1/${t}?id=eq.${id}`, {method:'DELETE', headers: H}),
+};
+
+/* ═══════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════ */
+const S = {
+  page: 'dashboard',
+  pilots: [], aircraft: [], flights: [], sims: [], licenses: [],
+  derogations: [], manex: [], signatures: [],
+  loading: true, synced: false,
+  planDate: todayStr(), planTab: 'vols', compTab: 'derog',
+};
+
+/* ═══════════════════════════════════════════
+   UTILS
+═══════════════════════════════════════════ */
+function todayStr() {
+  return new Date().toISOString().split('T')[0];
+}
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('fr-FR', {day:'2-digit', month:'short', year:'numeric'});
+}
+function fmtTime(dt) {
+  if (!dt) return '—';
+  return new Date(dt).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+}
+function daysUntil(d) {
+  if (!d) return null;
+  return Math.ceil((new Date(d) - new Date()) / 86400000);
+}
+function alertColor(days) {
+  if (days === null) return 'var(--t3)';
+  if (days < 0) return 'var(--red)';
+  if (days < 30) return 'var(--amber)';
+  return 'var(--green)';
+}
+function alertBg(days) {
+  if (days === null) return '#F3F4F6';
+  if (days < 0) return 'var(--red-p)';
+  if (days < 30) return 'var(--amber-p)';
+  return 'var(--green-p)';
+}
+function pilotName(id) {
+  const p = S.pilots.find(p => p.id === id);
+  return p ? `${p.first_name} ${p.last_name}` : '—';
+}
+function aircraftName(id) {
+  const a = S.aircraft.find(a => a.id === id);
+  return a ? a.name : '—';
+}
+function licLabel(t) {
+  return {MEP:'MEP', SEP:'SEP', IRME:'IR/ME', CRM:'CRM', CLASSE_1:'Classe 1'}[t] || t;
+}
+function alertCount() {
+  return S.licenses.filter(l => { const d = daysUntil(l.expiry_date); return d !== null && d < 30; }).length;
+}
+function safe(arr) { return Array.isArray(arr) ? arr : []; }
+function first(res) { const a = safe(res); return a[0] || null; }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ═══════════════════════════════════════════
+   UTC CLOCK
+═══════════════════════════════════════════ */
+function tickClock() {
+  const now = new Date();
+  const h = String(now.getUTCHours()).padStart(2,'0');
+  const m = String(now.getUTCMinutes()).padStart(2,'0');
+  const el = document.getElementById('utc');
+  if (el) el.textContent = `${h}:${m} UTC`;
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+/* ═══════════════════════════════════════════
+   NAV CONFIG
+═══════════════════════════════════════════ */
+const PAGES = [
+  { id: 'dashboard', label: 'Dashboard', icon: iconGrid() },
+  { id: 'planning',  label: 'Planning',  icon: iconCal() },
+  { id: 'flotte',   label: 'Flotte',    icon: iconPlane() },
+  { id: 'crew',     label: 'Crew',      icon: iconUsers() },
+  { id: 'compliance',label: 'Compliance',icon: iconShield() },
+];
+
+function buildNav() {
+  const snav = document.getElementById('snav');
+  const bnav = document.getElementById('bnav');
+  const cnt = alertCount();
+
+  snav.innerHTML = PAGES.map(p => `
+    <button class="nb ${S.page===p.id?'on':''}" onclick="goTo('${p.id}')">
+      ${p.icon} ${esc(p.label)}
+      ${p.id==='dashboard' && cnt>0 ? `<span class="nb-badge" style="display:inline">${cnt}</span>` : ''}
+    </button>`).join('');
+
+  bnav.innerHTML = PAGES.map(p => `
+    <button class="bnb ${S.page===p.id?'on':''}" onclick="goTo('${p.id}')">
+      ${p.icon} ${esc(p.label)}
+    </button>`).join('');
+
+  const dot = document.getElementById('dot');
+  if (dot) { dot.className = S.synced ? '' : 'err'; }
+}
+
+/* ═══════════════════════════════════════════
+   ROUTING
+═══════════════════════════════════════════ */
+function goTo(page) {
+  S.page = page;
+  buildNav();
+  renderPage();
+}
+
+function renderPage() {
+  const c = document.getElementById('content');
+  if (S.loading) { c.innerHTML = '<div class="spinner-w"><div class="spinner"></div></div>'; return; }
+  const r = {
+    dashboard: renderDashboard,
+    planning: renderPlanning,
+    flotte: renderFlotte,
+    crew: renderCrew,
+    compliance: renderCompliance,
+  };
+  (r[S.page] || renderDashboard)();
+}
+
+/* ═══════════════════════════════════════════
+   LOAD DATA
+═══════════════════════════════════════════ */
+async function loadAll() {
+  S.loading = true;
+  renderPage();
+  try {
+    const [p,a,f,ss,l,d,m,sg] = await Promise.all([
+      db.get('pilots','order=created_at.asc'),
+      db.get('aircraft','order=created_at.asc'),
+      db.get('flights','order=departure_time.desc'),
+      db.get('simulator_sessions','order=date.desc,start_time.desc'),
+      db.get('licenses','order=expiry_date.asc'),
+      db.get('ifr_derogations','order=signed_at.desc'),
+      db.get('manex_documents','order=created_at.desc'),
+      db.get('manex_signatures','order=signed_at.desc'),
+    ]);
+    S.pilots=safe(p); S.aircraft=safe(a); S.flights=safe(f); S.sims=safe(ss);
+    S.licenses=safe(l); S.derogations=safe(d); S.manex=safe(m); S.signatures=safe(sg);
+    S.synced = true;
+  } catch(e) { S.synced = false; }
+  S.loading = false;
+  buildNav();
+  renderPage();
+}
+
+/* ═══════════════════════════════════════════
+   MODAL
+═══════════════════════════════════════════ */
+function openModal(title, html) {
+  document.getElementById('m-title').textContent = title;
+  document.getElementById('m-body').innerHTML = html;
+  document.getElementById('overlay').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('m-body').innerHTML = '';
+}
+function val(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
+
+/* ═══════════════════════════════════════════
+   PAGE: DASHBOARD
+═══════════════════════════════════════════ */
+function renderDashboard() {
+  const c = document.getElementById('content');
+  const todayS = todayStr();
+  const todayFlights = S.flights.filter(f => f.departure_time?.startsWith(todayS));
+  const todaySims = S.sims.filter(s => s.date === todayS);
+  const expLics = S.licenses.filter(l => { const d = daysUntil(l.expiry_date); return d !== null && d < 0; });
+  const soonLics = S.licenses.filter(l => { const d = daysUntil(l.expiry_date); return d !== null && d >= 0 && d < 30; });
+  const allAlerts = [...expLics, ...soonLics];
+
+  const dateStr = new Date().toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+
+  c.innerHTML = `
+    <div class="ph">
+      <div>
+        <h1>Dashboard</h1>
+        <div class="pg-sub">${cap(dateStr)}</div>
+      </div>
+    </div>
+
+    ${allAlerts.length > 0 ? `
+    <div style="margin-bottom:24px">
+      <span class="sec-label">Alertes licences</span>
+      ${expLics.map(l => `
+        <div class="alert-li red">
+          <div><strong style="font-size:14px">${licLabel(l.type)}</strong> <span style="color:var(--t2);font-size:13px">— ${pilotName(l.pilot_id)}</span></div>
+          <span class="badge" style="background:var(--red-p);color:var(--red)">Expiré ${fmtDate(l.expiry_date)}</span>
+        </div>`).join('')}
+      ${soonLics.map(l => `
+        <div class="alert-li amber">
+          <div><strong style="font-size:14px">${licLabel(l.type)}</strong> <span style="color:var(--t2);font-size:13px">— ${pilotName(l.pilot_id)}</span></div>
+          <span class="badge" style="background:var(--amber-p);color:var(--amber)">J-${daysUntil(l.expiry_date)}</span>
+        </div>`).join('')}
+    </div>` : ''}
+
+    <div class="stats">
+      <div class="stat"><div class="stat-v" style="color:var(--navy)">${todayFlights.length}</div><div class="stat-l">Vols aujourd'hui</div></div>
+      <div class="stat"><div class="stat-v" style="color:var(--navy)">${todaySims.length}</div><div class="stat-l">Séances sim.</div></div>
+      <div class="stat"><div class="stat-v" style="color:${allAlerts.length>0?(expLics.length>0?'var(--red)':'var(--amber)'):'var(--green)'}">${allAlerts.length}</div><div class="stat-l">Alertes licences</div></div>
+      <div class="stat"><div class="stat-v" style="color:var(--green)">${S.pilots.length}</div><div class="stat-l">Pilotes actifs</div></div>
+    </div>
+
+    <span class="sec-label">Vols du jour</span>
+    ${todayFlights.length === 0 ? '<div class="card" style="color:var(--t3);font-size:14px;text-align:center;padding:20px">Aucun vol prévu aujourd\'hui</div>' :
+      todayFlights.map(f => `
+        <div class="li">
+          <div>
+            <div class="li-title">${esc(f.departure)} → ${esc(f.arrival)}</div>
+            <div class="li-sub">${esc(aircraftName(f.aircraft_id))} · ${esc(pilotName(f.pilot_id))}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-weight:700;font-size:15px;color:var(--navy)">${fmtTime(f.departure_time)} → ${fmtTime(f.arrival_time)}</div>
+            <span class="badge" style="background:var(--navy-pale);color:var(--navy)">${esc(f.flight_type)}</span>
+          </div>
+        </div>`).join('')}
+
+    ${todaySims.length > 0 ? `
+      <span class="sec-label" style="margin-top:24px">Simulateur du jour</span>
+      ${todaySims.map(s => `
+        <div class="li">
+          <div>
+            <div class="li-title">${esc(s.client_name||'—')}</div>
+            <div class="li-sub">${esc(s.session_type||'')} · ${esc(pilotName(s.handler_id))}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-weight:700;font-size:15px">${(s.start_time||'').slice(0,5)} – ${(s.end_time||'').slice(0,5)}</div>
+            ${s.amount ? `<div style="font-size:14px;color:var(--navy);font-weight:600">${s.amount} €</div>` : ''}
+          </div>
+        </div>`).join('')}` : ''}
+  `;
+}
+
+/* ═══════════════════════════════════════════
+   PAGE: PLANNING — CALENDAR VIEW
+═══════════════════════════════════════════ */
+function renderPlanning() {
+  const c = document.getElementById('content');
+  const today = todayStr();
+
+  // Build calendar for selected month
+  const [selY, selM] = S.planDate.split('-').map(Number);
+  const firstDay = new Date(selY, selM - 1, 1);
+  const lastDay = new Date(selY, selM, 0);
+  // Monday-first: 0=Mon..6=Sun
+  let startDow = (firstDay.getDay() + 6) % 7;
+  const totalCells = Math.ceil((startDow + lastDay.getDate()) / 7) * 7;
+
+  const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const DOWS = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+
+  function eventsByDate(dateStr) {
+    const vols = S.flights.filter(f => f.departure_time?.startsWith(dateStr));
+    const sims = S.sims.filter(s => s.date === dateStr);
+    return { vols, sims };
+  }
+
+  function cellHTML(dateStr, isOther) {
+    const { vols, sims } = eventsByDate(dateStr);
+    const dayNum = parseInt(dateStr.split('-')[2]);
+    const isToday = dateStr === today;
+    const isSelected = dateStr === S.planDate;
+    let cls = 'cal-cell';
+    if (isOther) cls += ' other';
+    if (isToday) cls += ' today';
+    if (isSelected) cls += ' selected';
+    const pills = [
+      ...vols.map(f => `<div class="cal-pill vol"><span class="cal-dot vol"></span><span>${esc(f.departure||'')}→${esc(f.arrival||'')}</span></div>`),
+      ...sims.map(s => `<div class="cal-pill sim"><span class="cal-dot sim"></span><span>${esc(s.client_name||'Sim')}</span></div>`)
+    ].join('');
+    const dots = [
+      ...vols.map(() => '<span class="cal-dot vol"></span>'),
+      ...sims.map(() => '<span class="cal-dot sim"></span>')
+    ].join('');
+    return `<div class="${cls}" onclick="S.planDate='${dateStr}';renderPlanning()">
+      <div class="cal-day-num">${dayNum}</div>
+      <div class="cal-pills">${pills}</div>
+      <div class="cal-dots">${dots}</div>
+    </div>`;
+  }
+
+  let calCells = DOWS.map(d => `<div class="cal-dow">${d}</div>`).join('');
+  for (let i = 0; i < totalCells; i++) {
+    const offset = i - startDow;
+    const cellDate = new Date(selY, selM - 1, 1 + offset);
+    const dateStr = cellDate.toISOString().split('T')[0];
+    const isOther = cellDate.getMonth() !== selM - 1;
+    calCells += cellHTML(dateStr, isOther);
+  }
+
+  // Day detail
+  const { vols: dayFlights, sims: daySims } = eventsByDate(S.planDate);
+  const selDateLabel = new Date(S.planDate).toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long'});
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+
+  const allEvents = [
+    ...dayFlights.map(f => ({type:'vol', obj:f})),
+    ...daySims.map(s => ({type:'sim', obj:s}))
+  ].sort((a,b) => {
+    const ta = a.type==='vol' ? a.obj.departure_time||'' : (S.planDate+'T'+(a.obj.start_time||''));
+    const tb = b.type==='vol' ? b.obj.departure_time||'' : (S.planDate+'T'+(b.obj.start_time||''));
+    return ta.localeCompare(tb);
+  });
+
+  const eventsHTML = allEvents.length === 0
+    ? `<div class="empty" style="padding:28px 20px">Aucun événement ce jour</div>`
+    : allEvents.map(({type, obj}) => {
+        if (type === 'vol') {
+          return `<div class="cal-event vol">
+            <div style="min-width:0">
+              <div class="cal-event-kind vol">Vol</div>
+              <div class="cal-event-title">${esc(obj.departure||'?')} → ${esc(obj.arrival||'?')}</div>
+              <div class="cal-event-sub">${esc(aircraftName(obj.aircraft_id))} · ${esc(pilotName(obj.pilot_id))}</div>
+              ${obj.flight_type ? `<div class="cal-event-sub">${esc(obj.flight_type)}</div>` : ''}
+              ${obj.notes ? `<div class="cal-event-sub" style="color:var(--t3)">${esc(obj.notes)}</div>` : ''}
+            </div>
+            <div style="flex-shrink:0">
+              <div class="cal-event-time">${fmtTime(obj.departure_time)}</div>
+              <div class="cal-event-time-sub">→ ${fmtTime(obj.arrival_time)}</div>
+              <div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end">
+                <button class="btn-g btn-sm" onclick="openEditVol('${obj.id}')">Modifier</button>
+                <button class="btn-d" onclick="deleteVol('${obj.id}')">Supprimer</button>
+              </div>
+            </div>
+          </div>`;
+        } else {
+          return `<div class="cal-event sim">
+            <div style="min-width:0">
+              <div class="cal-event-kind sim">Simulateur</div>
+              <div class="cal-event-title">${esc(obj.client_name||'—')}</div>
+              <div class="cal-event-sub">${esc(obj.session_type||'')}${obj.client_origin?' · '+esc(obj.client_origin):''}</div>
+              <div class="cal-event-sub">Responsable : ${esc(pilotName(obj.handler_id))}</div>
+              ${obj.notes ? `<div class="cal-event-sub" style="color:var(--t3)">${esc(obj.notes)}</div>` : ''}
+            </div>
+            <div style="flex-shrink:0">
+              <div class="cal-event-time">${(obj.start_time||'').slice(0,5)} – ${(obj.end_time||'').slice(0,5)}</div>
+              ${obj.amount ? `<div class="cal-event-time-sub">${obj.amount} €</div>` : ''}
+              <div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end">
+                <button class="btn-g btn-sm" onclick="openEditSim('${obj.id}')">Modifier</button>
+                <button class="btn-d" onclick="deleteSim('${obj.id}')">Supprimer</button>
+              </div>
+            </div>
+          </div>`;
+        }
+      }).join('');
+
+  c.innerHTML = `
+    <div class="ph" style="margin-bottom:20px">
+      <h1>Planning</h1>
+      <div class="row">
+        <button class="btn" onclick="S.planDate=todayStr();renderPlanning()">Aujourd'hui</button>
+      </div>
+    </div>
+
+    <div class="cal-month-header">
+      <div class="cal-month-title">${MONTHS[selM-1]} ${selY}</div>
+      <div class="row">
+        <button class="btn-g" onclick="changeMonth(-1)">‹</button>
+        <button class="btn-g" onclick="changeMonth(1)">›</button>
+      </div>
+    </div>
+
+    <div class="cal-legend">
+      <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#2563EB"></div>Vol</div>
+      <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#7C3AED"></div>Simulateur</div>
+    </div>
+
+    <div class="cal-grid">${calCells}</div>
+
+    <div class="cal-day-detail">
+      <div class="cal-day-detail-head">
+        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:var(--navy)">${cap(selDateLabel)}</div>
+        <div class="row">
+          <button class="btn-g btn-sm" onclick="openNewVol()">+ Vol</button>
+          <button class="btn" onclick="openNewSim()" style="background:#7C3AED">+ Sim</button>
+        </div>
+      </div>
+      ${eventsHTML}
+    </div>
+  `;
+}
+
+function changeMonth(delta) {
+  const [y, m] = S.planDate.split('-').map(Number);
+  const newDate = new Date(y, m - 1 + delta, 1);
+  S.planDate = newDate.toISOString().split('T')[0];
+  renderPlanning();
+}
+
+/* VOL MODALS */
+function volForm(v={}) {
+  const planes = S.aircraft.filter(a => a.type === 'aircraft');
+  return `
+    <div class="field"><label>Appareil *</label><select id="f-ac">
+      <option value="">Choisir...</option>
+      ${planes.map(a => `<option value="${a.id}" ${v.aircraft_id===a.id?'selected':''}>${esc(a.name)} (${esc(a.registration||'')})</option>`).join('')}
+    </select></div>
+    <div class="field"><label>Pilote *</label><select id="f-pi">
+      <option value="">Choisir...</option>
+      ${S.pilots.map(p => `<option value="${p.id}" ${v.pilot_id===p.id?'selected':''}>${esc(p.first_name)} ${esc(p.last_name)}</option>`).join('')}
+    </select></div>
+    <div class="field"><label>Type de vol</label><select id="f-ty">
+      ${['Voyage','Entraînement','Convoyage'].map(t => `<option ${v.flight_type===t?'selected':''}>${t}</option>`).join('')}
+    </select></div>
+    <div class="g2">
+      <div class="field"><label>Départ *</label><input id="f-dep" value="${esc(v.departure||'')}" placeholder="LFPG"></div>
+      <div class="field"><label>Arrivée *</label><input id="f-arr" value="${esc(v.arrival||'')}" placeholder="LFMN"></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Heure départ *</label><input type="datetime-local" id="f-dt" value="${v.departure_time?v.departure_time.slice(0,16):''}"></div>
+      <div class="field"><label>Heure arrivée *</label><input type="datetime-local" id="f-at" value="${v.arrival_time?v.arrival_time.slice(0,16):''}"></div>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="f-no">${esc(v.notes||'')}</textarea></div>
+    <div class="m-foot">
+      <button class="btn-g" onclick="closeModal()">Annuler</button>
+      <button class="btn" onclick="saveVol(${v.id?`'${v.id}'`:'null'})">Enregistrer</button>
+    </div>`;
+}
+
+function openNewVol() { openModal('Nouveau vol', volForm()); }
+function openEditVol(id) { const v = S.flights.find(f => f.id===id); if(v) openModal('Modifier le vol', volForm(v)); }
+
+async function saveVol(id) {
+  const d = { aircraft_id: val('f-ac'), pilot_id: val('f-pi'), flight_type: val('f-ty'), departure: val('f-dep'), arrival: val('f-arr'), departure_time: val('f-dt'), arrival_time: val('f-at'), notes: val('f-no') };
+  if (!d.aircraft_id||!d.pilot_id||!d.departure||!d.arrival||!d.departure_time||!d.arrival_time) return alert('Champs obligatoires manquants');
+  if (id) {
+    const r = await db.patch('flights', id, d);
+    const u = first(r)||{...S.flights.find(f=>f.id===id),...d};
+    S.flights = S.flights.map(f => f.id===id ? u : f);
+  } else {
+    const r = await db.post('flights', d);
+    const n = first(r); if(n) S.flights.unshift(n);
+  }
+  closeModal(); renderPlanning();
+}
+
+async function deleteVol(id) {
+  if (!confirm('Supprimer ce vol ?')) return;
+  await db.del('flights', id);
+  S.flights = S.flights.filter(f => f.id !== id);
+  renderPlanning();
+}
+
+/* SIM MODALS */
+function simForm(s={}) {
+  return `
+    <div class="g2">
+      <div class="field"><label>Date</label><input type="date" id="s-da" value="${s.date||S.planDate}"></div>
+      <div class="field"><label>&nbsp;</label></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Heure début *</label><input type="time" id="s-st" value="${s.start_time||''}"></div>
+      <div class="field"><label>Heure fin *</label><input type="time" id="s-et" value="${s.end_time||''}"></div>
+    </div>
+    <div class="field"><label>Nom du client *</label><input id="s-cn" value="${esc(s.client_name||'')}" placeholder="Dupont Jean"></div>
+    <div class="field"><label>Origine du client</label><input id="s-co" value="${esc(s.client_origin||'')}" placeholder="Paris, recommandation..."></div>
+    <div class="field"><label>Type de séance</label><input id="s-ty" value="${esc(s.session_type||'')}" placeholder="IFR, qualification, découverte..."></div>
+    <div class="g2">
+      <div class="field"><label>Montant (EUR)</label><input type="number" id="s-am" value="${s.amount||''}" placeholder="0.00" step="0.01"></div>
+      <div class="field"><label>Responsable</label><select id="s-ha">
+        <option value="">Choisir...</option>
+        ${S.pilots.map(p => `<option value="${p.id}" ${s.handler_id===p.id?'selected':''}>${esc(p.first_name)} ${esc(p.last_name)}</option>`).join('')}
+      </select></div>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="s-no">${esc(s.notes||'')}</textarea></div>
+    <div class="m-foot">
+      <button class="btn-g" onclick="closeModal()">Annuler</button>
+      <button class="btn" onclick="saveSim(${s.id?`'${s.id}'`:'null'})">Enregistrer</button>
+    </div>`;
+}
+
+function openNewSim() { openModal('Nouvelle séance simulateur', simForm()); }
+function openEditSim(id) { const s = S.sims.find(s => s.id===id); if(s) openModal('Modifier la séance', simForm(s)); }
+
+async function saveSim(id) {
+  const sim = S.aircraft.find(a => a.type==='simulator');
+  const d = { date: val('s-da'), start_time: val('s-st'), end_time: val('s-et'), client_name: val('s-cn'), client_origin: val('s-co'), session_type: val('s-ty'), amount: val('s-am') ? parseFloat(val('s-am')) : null, handler_id: val('s-ha') || null, notes: val('s-no'), simulator_id: sim?.id || null };
+  if (!d.client_name||!d.start_time||!d.end_time) return alert('Champs obligatoires manquants');
+  if (id) {
+    const r = await db.patch('simulator_sessions', id, d);
+    const u = first(r)||{...S.sims.find(s=>s.id===id),...d};
+    S.sims = S.sims.map(s => s.id===id ? u : s);
+  } else {
+    const r = await db.post('simulator_sessions', d);
+    const n = first(r); if(n) S.sims.unshift(n);
+  }
+  closeModal(); renderPlanning();
+}
+
+async function deleteSim(id) {
+  if (!confirm('Supprimer cette séance ?')) return;
+  await db.del('simulator_sessions', id);
+  S.sims = S.sims.filter(s => s.id !== id);
+  renderPlanning();
+}
+
+/* ═══════════════════════════════════════════
+   PAGE: FLOTTE
+═══════════════════════════════════════════ */
+function renderFlotte() {
+  const c = document.getElementById('content');
+  const planes = S.aircraft.filter(a => a.type === 'aircraft');
+  const sims = S.aircraft.filter(a => a.type === 'simulator');
+
+  const acCard = a => `
+    <div class="li">
+      <div>
+        <div class="li-title">${esc(a.name)}</div>
+        ${a.registration ? `<div class="li-sub">${esc(a.registration)}</div>` : ''}
+        ${a.model ? `<div style="font-size:13px;color:var(--t3)">${esc(a.model)}</div>` : ''}
+      </div>
+      <div class="li-actions">
+        <button class="btn-g btn-sm" onclick="openEditAc('${a.id}')">Modifier</button>
+        <button class="btn-d" onclick="deleteAc('${a.id}')">Supprimer</button>
+      </div>
+    </div>`;
+
+  c.innerHTML = `
+    <div class="ph">
+      <h1>Flotte</h1>
+      <button class="btn" onclick="openNewAc()">+ Ajouter</button>
+    </div>
+    <span class="sec-label">Avions</span>
+    ${planes.length === 0 ? '<div class="empty">Aucun avion</div>' : planes.map(acCard).join('')}
+    <span class="sec-label" style="margin-top:24px">Simulateurs</span>
+    ${sims.length === 0 ? '<div class="empty">Aucun simulateur</div>' : sims.map(acCard).join('')}
+  `;
+}
+
+function acForm(a={}) {
+  return `
+    <div class="field"><label>Nom *</label><input id="a-na" value="${esc(a.name||'')}" placeholder="SR22 G7+"></div>
+    <div class="field"><label>Immatriculation</label><input id="a-re" value="${esc(a.registration||'')}" placeholder="N119AL"></div>
+    <div class="field"><label>Modèle</label><input id="a-mo" value="${esc(a.model||'')}" placeholder="Cirrus SR22 G7+"></div>
+    <div class="field"><label>Type</label><select id="a-ty">
+      <option value="aircraft" ${a.type!=='simulator'?'selected':''}>Avion</option>
+      <option value="simulator" ${a.type==='simulator'?'selected':''}>Simulateur</option>
+    </select></div>
+    <div class="m-foot">
+      <button class="btn-g" onclick="closeModal()">Annuler</button>
+      <button class="btn" onclick="saveAc(${a.id?`'${a.id}'`:'null'})">Enregistrer</button>
+    </div>`;
+}
+
+function openNewAc() { openModal('Nouvel appareil', acForm()); }
+function openEditAc(id) { const a = S.aircraft.find(a => a.id===id); if(a) openModal('Modifier', acForm(a)); }
+
+async function saveAc(id) {
+  const d = { name: val('a-na'), registration: val('a-re'), model: val('a-mo'), type: val('a-ty') };
+  if (!d.name) return alert('Nom requis');
+  if (id) {
+    const r = await db.patch('aircraft', id, d);
+    const u = first(r)||{...S.aircraft.find(a=>a.id===id),...d};
+    S.aircraft = S.aircraft.map(a => a.id===id ? u : a);
+  } else {
+    const r = await db.post('aircraft', d);
+    const n = first(r); if(n) S.aircraft.push(n);
+  }
+  closeModal(); renderFlotte();
+}
+
+async function deleteAc(id) {
+  if (!confirm('Supprimer cet appareil ?')) return;
+  await db.del('aircraft', id);
+  S.aircraft = S.aircraft.filter(a => a.id !== id);
+  renderFlotte();
+}
+
+/* ═══════════════════════════════════════════
+   PAGE: CREW
+═══════════════════════════════════════════ */
+const LIC_TYPES = ['MEP','SEP','IRME','CRM','CLASSE_1'];
+
+function renderCrew() {
+  const c = document.getElementById('content');
+  c.innerHTML = `
+    <div class="ph">
+      <h1>Crew</h1>
+      <button class="btn" onclick="openNewPilot()">+ Pilote</button>
+    </div>
+    ${S.pilots.length === 0 ? '<div class="empty">Aucun pilote</div>' :
+      S.pilots.map(p => {
+        const lics = S.licenses.filter(l => l.pilot_id === p.id);
+        return `
+          <div class="crew-card">
+            <div class="crew-h">
+              <div>
+                <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:20px;color:var(--navy)">${esc(p.first_name)} ${esc(p.last_name)}</div>
+                <div style="font-size:13px;color:var(--t2);margin-top:3px">
+                  ${p.role==='chief_pilot'?'Chef Pilote':'Pilote'}
+                  ${p.email?` · ${esc(p.email)}`:''}
+                  ${p.phone?` · ${esc(p.phone)}`:''}
+                </div>
+              </div>
+              <div class="li-actions">
+                <button class="btn-g btn-sm" onclick="openEditPilot('${p.id}')">Modifier</button>
+                <button class="btn-d" onclick="deletePilot('${p.id}')">Supprimer</button>
+              </div>
+            </div>
+            <div class="crew-div">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                <span class="sec-label" style="margin:0">Licences & Qualifications</span>
+                <button class="btn-g" style="padding:4px 10px;font-size:12px" onclick="openNewLic('${p.id}')">+ Ajouter</button>
+              </div>
+              ${lics.length === 0 ? '<div style="font-size:13px;color:var(--t3)">Aucune licence enregistrée</div>' : `
+                <div class="lic-g">
+                  ${lics.map(l => {
+                    const days = daysUntil(l.expiry_date);
+                    const col = alertColor(days);
+                    return `
+                      <div class="lic" style="background:${alertBg(days)}">
+                        <div class="lic-n" style="color:${col}">${licLabel(l.type)}</div>
+                        <div class="lic-d">${fmtDate(l.expiry_date)}</div>
+                        <div class="lic-s" style="color:${col}">
+                          ${days===null?'—':days<0?`Expiré (${Math.abs(days)}j)`:days<30?`J-${days}`:'Valide'}
+                        </div>
+                        <div class="lic-a">
+                          <button class="lic-btn" onclick="openEditLic('${p.id}','${l.id}')">Éditer</button>
+                          <button class="lic-btn" style="color:var(--red)" onclick="deleteLic('${l.id}')">×</button>
+                        </div>
+                      </div>`;
+                  }).join('')}
+                </div>`}
+            </div>
+          </div>`;
+      }).join('')}
+  `;
+}
+
+function pilotForm(p={}) {
+  return `
+    <div class="g2">
+      <div class="field"><label>Prénom *</label><input id="p-fn" value="${esc(p.first_name||'')}"></div>
+      <div class="field"><label>Nom *</label><input id="p-ln" value="${esc(p.last_name||'')}"></div>
+    </div>
+    <div class="field"><label>Rôle</label><select id="p-ro">
+      <option value="pilot" ${p.role!=='chief_pilot'?'selected':''}>Pilote</option>
+      <option value="chief_pilot" ${p.role==='chief_pilot'?'selected':''}>Chef Pilote</option>
+    </select></div>
+    <div class="field"><label>Email</label><input type="email" id="p-em" value="${esc(p.email||'')}"></div>
+    <div class="field"><label>Téléphone</label><input id="p-ph" value="${esc(p.phone||'')}"></div>
+    <div class="m-foot">
+      <button class="btn-g" onclick="closeModal()">Annuler</button>
+      <button class="btn" onclick="savePilot(${p.id?`'${p.id}'`:'null'})">Enregistrer</button>
+    </div>`;
+}
+
+function openNewPilot() { openModal('Nouveau pilote', pilotForm()); }
+function openEditPilot(id) { const p = S.pilots.find(p => p.id===id); if(p) openModal('Modifier le pilote', pilotForm(p)); }
+
+async function savePilot(id) {
+  const d = { first_name: val('p-fn'), last_name: val('p-ln'), role: val('p-ro'), email: val('p-em'), phone: val('p-ph') };
+  if (!d.first_name||!d.last_name) return alert('Prénom et Nom requis');
+  if (id) {
+    const r = await db.patch('pilots', id, d);
+    const u = first(r)||{...S.pilots.find(p=>p.id===id),...d};
+    S.pilots = S.pilots.map(p => p.id===id ? u : p);
+  } else {
+    const r = await db.post('pilots', d);
+    const n = first(r); if(n) S.pilots.push(n);
+  }
+  closeModal(); renderCrew();
+}
+
+async function deletePilot(id) {
+  if (!confirm('Supprimer ce pilote ?')) return;
+  await db.del('pilots', id);
+  S.pilots = S.pilots.filter(p => p.id !== id);
+  renderCrew();
+}
+
+function licForm(pilotId, l={}) {
+  return `
+    <div class="field"><label>Type</label><select id="l-ty">
+      ${LIC_TYPES.map(t => `<option value="${t}" ${l.type===t?'selected':''}>${licLabel(t)}</option>`).join('')}
+    </select></div>
+    <div class="field"><label>Date d'expiration</label><input type="date" id="l-ex" value="${l.expiry_date||''}"></div>
+    <div class="m-foot">
+      <button class="btn-g" onclick="closeModal()">Annuler</button>
+      <button class="btn" onclick="saveLic('${pilotId}',${l.id?`'${l.id}'`:'null'})">Enregistrer</button>
+    </div>`;
+}
+
+function openNewLic(pilotId) { openModal('Nouvelle licence', licForm(pilotId)); }
+function openEditLic(pilotId, licId) { const l = S.licenses.find(l => l.id===licId); if(l) openModal('Modifier la licence', licForm(pilotId, l)); }
+
+async function saveLic(pilotId, id) {
+  const d = { type: val('l-ty'), expiry_date: val('l-ex'), pilot_id: pilotId };
+  if (id) {
+    const r = await db.patch('licenses', id, d);
+    const u = first(r)||{...S.licenses.find(l=>l.id===id),...d};
+    S.licenses = S.licenses.map(l => l.id===id ? u : l);
+  } else {
+    const r = await db.post('licenses', d);
+    const n = first(r); if(n) S.licenses.push(n);
+  }
+  closeModal(); buildNav(); renderCrew();
+}
+
+async function deleteLic(id) {
+  await db.del('licenses', id);
+  S.licenses = S.licenses.filter(l => l.id !== id);
+  buildNav(); renderCrew();
+}
+
+/* ═══════════════════════════════════════════
+   PAGE: COMPLIANCE
+═══════════════════════════════════════════ */
+function renderCompliance() {
+  const c = document.getElementById('content');
+  const t = S.compTab;
+  const chief = S.pilots.find(p => p.role === 'chief_pilot');
+
+  c.innerHTML = `
+    <div class="ph">
+      <h1>Compliance</h1>
+      <button class="btn" onclick="${t==='derog'?'openNewDerog()':'openNewManex()'}">+ Ajouter</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab ${t==='derog'?'on':''}" onclick="S.compTab='derog';renderCompliance()">Dérogations IFR</button>
+      <button class="tab ${t==='manex'?'on':''}" onclick="S.compTab='manex';renderCompliance()">MANEX</button>
+    </div>
+
+    ${t === 'derog' ? (
+      S.derogations.length === 0 ? '<div class="empty">Aucune dérogation IFR</div>' :
+      S.derogations.map(d => `
+        <div class="alert-li navy">
+          <div>
+            <div style="font-weight:600;font-size:14px;margin-bottom:4px">${esc(d.description||'—')}</div>
+            <div style="font-size:13px;color:var(--t2)">Pilote : ${esc(pilotName(d.pilot_id))}</div>
+            <div style="font-size:13px;color:var(--t2)">Signé par : ${esc(pilotName(d.signed_by))}</div>
+            <div style="font-size:12px;color:var(--t3);margin-top:4px">
+              ${fmtDate(d.signed_at)} · Valide jusqu'au ${fmtDate(d.valid_until)}
+            </div>
+          </div>
+          <button class="btn-d" onclick="deleteDerog('${d.id}')">Supprimer</button>
+        </div>`).join('')
+    ) : (
+      S.manex.length === 0 ? '<div class="empty">Aucun document MANEX</div>' :
+      S.manex.map(doc => {
+        const docSigs = S.signatures.filter(s => s.document_id === doc.id);
+        return `
+          <div class="card" style="margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+              <div>
+                <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:var(--navy)">${esc(doc.title)}</div>
+                ${doc.version ? `<div style="font-size:13px;color:var(--t2)">Version ${esc(doc.version)}</div>` : ''}
+                ${doc.file_url ? `<a href="${esc(doc.file_url)}" target="_blank" style="font-size:12px;color:var(--navy)">Voir le document →</a>` : ''}
+              </div>
+              <button class="btn-d" onclick="deleteManex('${doc.id}')">Supprimer</button>
+            </div>
+            <div style="border-top:1px solid var(--border);padding-top:12px">
+              <span class="sec-label" style="margin-bottom:8px">Lu & Approuvé</span>
+              <div class="sign-row">
+                ${S.pilots.map(p => {
+                  const sig = docSigs.find(s => s.pilot_id === p.id);
+                  return `
+                    <div class="sign-chip" style="background:${sig?'var(--green-p)':'var(--navy-pale)'}">
+                      <span style="font-size:13px;font-weight:500;color:${sig?'var(--green)':'var(--t2)'}">${esc(p.first_name)} ${esc(p.last_name)}</span>
+                      ${sig ? `<span style="font-size:11px;color:var(--green)">✓ ${fmtDate(sig.signed_at)}</span>` :
+                               `<button class="sign-btn" onclick="signManex('${doc.id}','${p.id}')">Signer</button>`}
+                    </div>`;
+                }).join('')}
+              </div>
+            </div>
+          </div>`;
+      }).join('')
+    )}
+  `;
+}
+
+function derogForm() {
+  const chief = S.pilots.find(p => p.role==='chief_pilot');
+  return `
+    <div class="field"><label>Pilote concerné</label><select id="d-pi">
+      <option value="">Choisir...</option>
+      ${S.pilots.map(p => `<option value="${p.id}">${esc(p.first_name)} ${esc(p.last_name)}</option>`).join('')}
+    </select></div>
+    <div class="field"><label>Description</label><textarea id="d-de" placeholder="Motif de la dérogation..."></textarea></div>
+    <div class="field"><label>Valide jusqu'au</label><input type="date" id="d-vu"></div>
+    ${chief ? `<div style="font-size:13px;color:var(--t2);margin-bottom:16px">Sera signé par : ${esc(chief.first_name)} ${esc(chief.last_name)} (Chef Pilote)</div>` : ''}
+    <div class="m-foot">
+      <button class="btn-g" onclick="closeModal()">Annuler</button>
+      <button class="btn" onclick="saveDerog()">Signer & Enregistrer</button>
+    </div>`;
+}
+
+function openNewDerog() { openModal('Nouvelle dérogation IFR', derogForm()); }
+
+async function saveDerog() {
+  const chief = S.pilots.find(p => p.role==='chief_pilot');
+  const d = { pilot_id: val('d-pi'), description: val('d-de'), valid_until: val('d-vu'), signed_by: chief?.id || null };
+  const r = await db.post('ifr_derogations', d);
+  const n = first(r); if(n) S.derogations.unshift(n);
+  closeModal(); renderCompliance();
+}
+
+async function deleteDerog(id) {
+  if (!confirm('Supprimer cette dérogation ?')) return;
+  await db.del('ifr_derogations', id);
+  S.derogations = S.derogations.filter(d => d.id !== id);
+  renderCompliance();
+}
+
+function manexForm() {
+  return `
+    <div class="field"><label>Titre du document *</label><input id="m-ti" placeholder="Procédure IFR, Checklist..."></div>
+    <div class="field"><label>Version</label><input id="m-ve" placeholder="1.0"></div>
+    <div class="field"><label>Lien (URL)</label><input id="m-ur" placeholder="https://..."></div>
+    <div class="m-foot">
+      <button class="btn-g" onclick="closeModal()">Annuler</button>
+      <button class="btn" onclick="saveManex()">Enregistrer</button>
+    </div>`;
+}
+
+function openNewManex() { openModal('Nouveau document MANEX', manexForm()); }
+
+async function saveManex() {
+  const d = { title: val('m-ti'), version: val('m-ve'), file_url: val('m-ur') };
+  if (!d.title) return alert('Titre requis');
+  const r = await db.post('manex_documents', d);
+  const n = first(r); if(n) S.manex.unshift(n);
+  closeModal(); renderCompliance();
+}
+
+async function deleteManex(id) {
+  if (!confirm('Supprimer ce document ?')) return;
+  await db.del('manex_documents', id);
+  S.manex = S.manex.filter(m => m.id !== id);
+  renderCompliance();
+}
+
+async function signManex(docId, pilotId) {
+  const r = await db.post('manex_signatures', { document_id: docId, pilot_id: pilotId });
+  const n = first(r); if(n) S.signatures.push(n);
+  renderCompliance();
+}
+
+/* ═══════════════════════════════════════════
+   SVG ICONS
+═══════════════════════════════════════════ */
+function iconGrid() { return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`; }
+function iconCal() { return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`; }
+function iconPlane() { return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21 4 19.5 2.5S18 2 16.5 3.5L13 7 4.8 5.2l-1.4 1.4 7.7 3.6L7.4 14H5l-1 1 3.5 1.5L9 20l1-1v-2.4l3.7-3.7 3.6 7.7z"/></svg>`; }
+function iconUsers() { return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`; }
+function iconShield() { return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`; }
+
+/* ═══════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════ */
+loadAll();
+</script>
+</body>
+</html>
