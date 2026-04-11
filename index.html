@@ -252,7 +252,8 @@ const S = {
    UTILS
 ═══════════════════════════════════════════ */
 function todayStr() {
-  return new Date().toISOString().split('T')[0];
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
 }
 function fmtDate(d) {
   if (!d) return '—';
@@ -532,14 +533,15 @@ function renderPlanning() {
   for (let i = 0; i < totalCells; i++) {
     const offset = i - startDow;
     const cellDate = new Date(selY, selM - 1, 1 + offset);
-    const dateStr = cellDate.toISOString().split('T')[0];
+    const dateStr = `${cellDate.getFullYear()}-${String(cellDate.getMonth()+1).padStart(2,'0')}-${String(cellDate.getDate()).padStart(2,'0')}`;
     const isOther = cellDate.getMonth() !== selM - 1;
     calCells += cellHTML(dateStr, isOther);
   }
 
   // Day detail
   const { vols: dayFlights, sims: daySims } = eventsByDate(S.planDate);
-  const selDateLabel = new Date(S.planDate).toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long'});
+  const [sdY, sdM, sdD] = S.planDate.split('-').map(Number);
+  const selDateLabel = new Date(sdY, sdM - 1, sdD).toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long'});
   const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
 
   const allEvents = [
@@ -632,7 +634,7 @@ function renderPlanning() {
 function changeMonth(delta) {
   const [y, m] = S.planDate.split('-').map(Number);
   const newDate = new Date(y, m - 1 + delta, 1);
-  S.planDate = newDate.toISOString().split('T')[0];
+  S.planDate = `${newDate.getFullYear()}-${String(newDate.getMonth()+1).padStart(2,'0')}-01`;
   renderPlanning();
 }
 
