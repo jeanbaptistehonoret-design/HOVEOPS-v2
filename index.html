@@ -1141,10 +1141,85 @@ function gonogoRow(label, id) {
   return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap">
     <span style="font-size:13px;flex:1">${label}</span>
     <div style="display:flex;gap:8px">
-      <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="${id}" value="GO"> <span style="color:var(--green);font-weight:600">GO</span></label>
-      <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="${id}" value="NO-GO"> <span style="color:var(--red);font-weight:600">NO-GO</span></label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="${id}" value="GO" onchange="checkFRNogo()"> <span style="color:var(--green);font-weight:600">GO</span></label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="${id}" value="NO-GO" onchange="checkFRNogo()"> <span style="color:var(--red);font-weight:600">NO-GO</span></label>
     </div>
   </div>`;
+}
+
+// Labels for each FR radio item to display in the NO-GO alert
+const FR_NOGO_LABELS = {
+  'fr-a1': 'MTOW & CG dans enveloppe AFM',
+  'fr-b1': 'Météo départ ≥ minima HOVE',
+  'fr-b2': 'Météo destination ≥ minima',
+  'fr-b3': 'Météo dégagement ≥ minima',
+  'fr-b4': 'Aucun SIGMET actif non mitigé',
+  'fr-b5': 'Turbulences ≤ modérées',
+  'fr-c1': 'ARC valide',
+  'fr-c2': 'Aucune échéance 50h/100h dépassée',
+  'fr-c3': 'MEL vérifiée — aucun NO-GO item inopérant',
+  'fr-c4': 'CAPS armé, pin retiré, échéance valide',
+  'fr-c5': 'TKS/FIKI niveau fluide OK',
+  'fr-c6': 'Aucune AN catégorie A non clôturée',
+  'fr-c7': 'Carburant confirmé',
+  'fr-d1': 'Repos ≥ 8h dans les 24h précédant le vol',
+  'fr-d2': 'Aucun médicament incompatible',
+  'fr-d3': 'Aucune pathologie aiguë',
+  'fr-d4': 'Alcool 0,00 g/L — délai ≥ 12h',
+  'fr-d5': 'État psychologique nominal',
+  'fr-d6': 'KSS ≤ 6',
+  'fr-e1': 'Plan de vol IFR déposé',
+  'fr-e2': 'NOTAMs vérifiés',
+};
+
+function checkFRNogo() {
+  const nogoItems = Object.keys(FR_NOGO_LABELS).filter(id => {
+    const el = document.querySelector(`input[name="${id}"]:checked`);
+    return el && el.value === 'NO-GO';
+  });
+
+  const alert = document.getElementById('fr-nogo-alert');
+  const list = document.getElementById('fr-nogo-list');
+  const goLabel = document.getElementById('fr-dec-go-label');
+  const goRadio = document.getElementById('fr-dec-go');
+  const nogoRadio = document.getElementById('fr-dec-nogo');
+  const btnSave = document.getElementById('fr-btn-save');
+  const btnDO = document.getElementById('fr-btn-do');
+
+  if (!alert) return;
+
+  if (nogoItems.length > 0) {
+    // Show alert with list of NO-GO items
+    list.innerHTML = nogoItems.map(id => `⛔ ${FR_NOGO_LABELS[id]}`).join('<br>');
+    alert.style.display = 'block';
+    // Force decision to NO-GO
+    if (nogoRadio) { nogoRadio.checked = true; }
+    // Disable GO option
+    if (goRadio) { goRadio.disabled = true; goRadio.checked = false; }
+    if (goLabel) { goLabel.style.opacity = '0.35'; goLabel.style.cursor = 'not-allowed'; }
+    // Show DO button, hide save
+    if (btnSave) btnSave.style.display = 'none';
+    if (btnDO) btnDO.style.display = 'inline-block';
+  } else {
+    alert.style.display = 'none';
+    list.innerHTML = '';
+    if (goRadio) { goRadio.disabled = false; }
+    if (goLabel) { goLabel.style.opacity = '1'; goLabel.style.cursor = 'pointer'; }
+    if (btnSave) btnSave.style.display = 'inline-block';
+    if (btnDO) btnDO.style.display = 'none';
+  }
+}
+
+async function saveFormDO() {
+  // Force NO-GO decision then save
+  const nogoRadio = document.getElementById('fr-dec-nogo');
+  if (nogoRadio) nogoRadio.checked = true;
+  // Add DO mention to motif if not already present
+  const motif = document.getElementById('fr-motif');
+  if (motif && !motif.value.includes('[DO]')) {
+    motif.value = '[NO-GO — Transmis au DO] ' + motif.value;
+  }
+  await saveForm('fr');
 }
 function secTitle(t) { return `<div style="font-family:'Syne',sans-serif;font-weight:700;font-size:13px;color:var(--navy);background:var(--navy-pale);padding:8px 12px;border-radius:8px;margin:16px 0 8px;letter-spacing:.3px">${t}</div>`; }
 function pilotOpts() { return S.pilots.map(p=>`<option value="${p.first_name} ${p.last_name}">${esc(p.first_name)} ${esc(p.last_name)}</option>`).join(''); }
@@ -1175,12 +1250,23 @@ function formFR() {
     ${gonogoRow('Plan de vol IFR déposé','fr-e1')}${gonogoRow('NOTAMs vérifiés','fr-e2')}
     <div class="field" style="margin-top:8px"><label>Référence IFPS</label><input id="fr-ifps" placeholder="ex: AS12345678"></div>
     ${secTitle('DÉCISION FINALE')}
+    <div id="fr-nogo-alert" style="display:none;background:#FEF2F2;border:2px solid var(--red);border-radius:10px;padding:14px 16px;margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:18px">🚫</span>
+        <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:15px;color:var(--red)">VOL INTERDIT — NO-GO DÉTECTÉ</span>
+      </div>
+      <div id="fr-nogo-list" style="font-size:13px;color:#B91C1C;line-height:1.8"></div>
+    </div>
     <div style="display:flex;gap:12px;margin-bottom:12px">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px;font-weight:600;color:var(--green)"><input type="radio" name="fr-dec" value="GO"> ✅ VOL AUTORISÉ — GO</label>
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px;font-weight:600;color:var(--red)"><input type="radio" name="fr-dec" value="NO-GO"> 🚫 VOL SUSPENDU — NO-GO</label>
+      <label id="fr-dec-go-label" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px;font-weight:600;color:var(--green)"><input type="radio" name="fr-dec" id="fr-dec-go" value="GO"> ✅ VOL AUTORISÉ — GO</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px;font-weight:600;color:var(--red)"><input type="radio" name="fr-dec" id="fr-dec-nogo" value="NO-GO"> 🚫 VOL SUSPENDU — NO-GO</label>
     </div>
     <div class="field"><label>Motif / dérogation DO (si NO-GO)</label><textarea id="fr-motif" rows="2" placeholder="Motif détaillé..."></textarea></div>
-    <div class="m-foot"><button class="btn-g" onclick="closeModal()">Annuler</button><button class="btn" onclick="saveForm('fr')">Enregistrer & Signer</button></div>`;
+    <div class="m-foot">
+      <button class="btn-g" onclick="closeModal()">Annuler</button>
+      <button class="btn" id="fr-btn-save" onclick="saveForm('fr')">Enregistrer & Signer</button>
+      <button class="btn" id="fr-btn-do" style="display:none;background:#EF4444" onclick="saveFormDO()">🚫 Envoyer NO-GO au DO</button>
+    </div>`;
 }
 
 function formMC() {
