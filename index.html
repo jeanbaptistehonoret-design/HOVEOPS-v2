@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>HOVE OPS</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -141,46 +142,6 @@ h1{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--navy
 /* SCROLLBAR */
 ::-webkit-scrollbar{width:4px}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
-
-/* CALENDAR */
-.cal-month-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
-.cal-month-title{font-family:"Syne",sans-serif;font-size:20px;font-weight:800;color:var(--navy)}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:24px}
-.cal-dow{background:var(--navy-pale);text-align:center;padding:8px 4px;font-size:11px;font-weight:600;color:var(--t2);letter-spacing:.5px;text-transform:uppercase;border-bottom:1px solid var(--border)}
-.cal-cell{background:var(--white);min-height:80px;padding:6px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;vertical-align:top}
-.cal-cell:nth-child(7n){border-right:none}
-.cal-cell:hover{background:var(--navy-pale)}
-.cal-cell.other{background:#FAFBFD}
-.cal-cell.other .cal-day-num{color:var(--t3)}
-.cal-cell.today .cal-day-num{background:var(--navy);color:#fff;border-radius:50%}
-.cal-cell.selected{background:#E8EFF9}
-.cal-day-num{font-size:13px;font-weight:600;color:var(--navy);width:22px;height:22px;display:flex;align-items:center;justify-content:center;margin-bottom:4px}
-.cal-pills{display:flex;flex-direction:column;gap:2px}
-.cal-pill{border-radius:4px;padding:2px 5px;font-size:10px;font-weight:600;display:flex;align-items:center;gap:3px;overflow:hidden;white-space:nowrap;max-width:100%}
-.cal-pill span{overflow:hidden;text-overflow:ellipsis}
-.cal-pill.vol{background:#DBEAFE;color:#1E40AF}
-.cal-pill.sim{background:#EDE9FE;color:#5B21B6}
-.cal-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
-.cal-dot.vol{background:#2563EB}
-.cal-dot.sim{background:#7C3AED}
-.cal-dots{display:flex;gap:3px;margin-top:3px}
-.cal-legend{display:flex;gap:16px;margin-bottom:16px}
-.cal-legend-item{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--t2)}
-.cal-legend-dot{width:10px;height:10px;border-radius:50%}
-.cal-day-detail{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:20px;box-shadow:var(--shadow)}
-.cal-day-detail-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px}
-.cal-event{border-radius:10px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-left:4px solid transparent}
-.cal-event.vol{background:#EFF6FF;border-left-color:#2563EB}
-.cal-event.sim{background:#F5F3FF;border-left-color:#7C3AED}
-.cal-event-kind{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px}
-.cal-event-kind.vol{color:#2563EB}
-.cal-event-kind.sim{color:#7C3AED}
-.cal-event-title{font-family:"Syne",sans-serif;font-weight:700;font-size:16px;color:var(--navy);margin-bottom:3px}
-.cal-event-sub{font-size:13px;color:var(--t2);margin-top:2px}
-.cal-event-time{font-weight:700;font-size:15px;color:var(--navy);text-align:right;white-space:nowrap}
-.cal-event-time-sub{font-size:12px;color:var(--t2);text-align:right;margin-top:2px}
-@media(max-width:768px){.cal-cell{min-height:50px;padding:4px}.cal-pills{display:none}.cal-dots{display:flex}}
-@media(min-width:769px){.cal-dots{display:none}}
 </style>
 </head>
 <body>
@@ -241,9 +202,9 @@ const db = {
 const S = {
   page: 'dashboard',
   pilots: [], aircraft: [], flights: [], sims: [], licenses: [],
-  derogations: [], manex: [], signatures: [],
+  derogations: [], manex: [], signatures: [], forms: [],
   loading: true, synced: false,
-  planDate: todayStr(), planTab: 'vols', compTab: 'derog',
+  planDate: todayStr(), planTab: 'vols', compTab: 'derog', formTab: 'fr',
 };
 
 /* ═══════════════════════════════════════════
@@ -316,6 +277,7 @@ const PAGES = [
   { id: 'flotte',   label: 'Flotte',    icon: iconPlane() },
   { id: 'crew',     label: 'Crew',      icon: iconUsers() },
   { id: 'compliance',label: 'Compliance',icon: iconShield() },
+  { id: 'formulaires',label: 'Formulaires',icon: iconDoc() },
 ];
 
 function buildNav() {
@@ -356,6 +318,7 @@ function renderPage() {
     flotte: renderFlotte,
     crew: renderCrew,
     compliance: renderCompliance,
+    formulaires: renderFormulaires,
   };
   (r[S.page] || renderDashboard)();
 }
@@ -367,7 +330,7 @@ async function loadAll() {
   S.loading = true;
   renderPage();
   try {
-    const [p,a,f,ss,l,d,m,sg] = await Promise.all([
+    const [p,a,f,ss,l,d,m,sg,fo] = await Promise.all([
       db.get('pilots','order=created_at.asc'),
       db.get('aircraft','order=created_at.asc'),
       db.get('flights','order=departure_time.desc'),
@@ -376,9 +339,10 @@ async function loadAll() {
       db.get('ifr_derogations','order=signed_at.desc'),
       db.get('manex_documents','order=created_at.desc'),
       db.get('manex_signatures','order=signed_at.desc'),
+      db.get('hove_forms','order=submitted_at.desc').catch(()=>[]),
     ]);
     S.pilots=safe(p); S.aircraft=safe(a); S.flights=safe(f); S.sims=safe(ss);
-    S.licenses=safe(l); S.derogations=safe(d); S.manex=safe(m); S.signatures=safe(sg);
+    S.licenses=safe(l); S.derogations=safe(d); S.manex=safe(m); S.signatures=safe(sg); S.forms=safe(fo);
     S.synced = true;
   } catch(e) { S.synced = false; }
   S.loading = false;
@@ -476,159 +440,70 @@ function renderDashboard() {
 }
 
 /* ═══════════════════════════════════════════
-   PAGE: PLANNING — CALENDAR VIEW
+   PAGE: PLANNING
 ═══════════════════════════════════════════ */
 function renderPlanning() {
   const c = document.getElementById('content');
-  const today = todayStr();
-
-  // Build calendar for selected month
-  const [selY, selM] = S.planDate.split('-').map(Number);
-  const firstDay = new Date(selY, selM - 1, 1);
-  const lastDay = new Date(selY, selM, 0);
-  // Monday-first: 0=Mon..6=Sun
-  let startDow = (firstDay.getDay() + 6) % 7;
-  const totalCells = Math.ceil((startDow + lastDay.getDate()) / 7) * 7;
-
-  const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
-  const DOWS = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
-
-  function eventsByDate(dateStr) {
-    const vols = S.flights.filter(f => f.departure_time?.startsWith(dateStr));
-    const sims = S.sims.filter(s => s.date === dateStr);
-    return { vols, sims };
-  }
-
-  function cellHTML(dateStr, isOther) {
-    const { vols, sims } = eventsByDate(dateStr);
-    const dayNum = parseInt(dateStr.split('-')[2]);
-    const isToday = dateStr === today;
-    const isSelected = dateStr === S.planDate;
-    let cls = 'cal-cell';
-    if (isOther) cls += ' other';
-    if (isToday) cls += ' today';
-    if (isSelected) cls += ' selected';
-    const pills = [
-      ...vols.map(f => `<div class="cal-pill vol"><span class="cal-dot vol"></span><span>${esc(f.departure||'')}→${esc(f.arrival||'')}</span></div>`),
-      ...sims.map(s => `<div class="cal-pill sim"><span class="cal-dot sim"></span><span>${esc(s.client_name||'Sim')}</span></div>`)
-    ].join('');
-    const dots = [
-      ...vols.map(() => '<span class="cal-dot vol"></span>'),
-      ...sims.map(() => '<span class="cal-dot sim"></span>')
-    ].join('');
-    return `<div class="${cls}" onclick="S.planDate='${dateStr}';renderPlanning()">
-      <div class="cal-day-num">${dayNum}</div>
-      <div class="cal-pills">${pills}</div>
-      <div class="cal-dots">${dots}</div>
-    </div>`;
-  }
-
-  let calCells = DOWS.map(d => `<div class="cal-dow">${d}</div>`).join('');
-  for (let i = 0; i < totalCells; i++) {
-    const offset = i - startDow;
-    const cellDate = new Date(selY, selM - 1, 1 + offset);
-    const dateStr = cellDate.toISOString().split('T')[0];
-    const isOther = cellDate.getMonth() !== selM - 1;
-    calCells += cellHTML(dateStr, isOther);
-  }
-
-  // Day detail
-  const { vols: dayFlights, sims: daySims } = eventsByDate(S.planDate);
-  const selDateLabel = new Date(S.planDate).toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long'});
-  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
-
-  const allEvents = [
-    ...dayFlights.map(f => ({type:'vol', obj:f})),
-    ...daySims.map(s => ({type:'sim', obj:s}))
-  ].sort((a,b) => {
-    const ta = a.type==='vol' ? a.obj.departure_time||'' : (S.planDate+'T'+(a.obj.start_time||''));
-    const tb = b.type==='vol' ? b.obj.departure_time||'' : (S.planDate+'T'+(b.obj.start_time||''));
-    return ta.localeCompare(tb);
-  });
-
-  const eventsHTML = allEvents.length === 0
-    ? `<div class="empty" style="padding:28px 20px">Aucun événement ce jour</div>`
-    : allEvents.map(({type, obj}) => {
-        if (type === 'vol') {
-          return `<div class="cal-event vol">
-            <div style="min-width:0">
-              <div class="cal-event-kind vol">Vol</div>
-              <div class="cal-event-title">${esc(obj.departure||'?')} → ${esc(obj.arrival||'?')}</div>
-              <div class="cal-event-sub">${esc(aircraftName(obj.aircraft_id))} · ${esc(pilotName(obj.pilot_id))}</div>
-              ${obj.flight_type ? `<div class="cal-event-sub">${esc(obj.flight_type)}</div>` : ''}
-              ${obj.notes ? `<div class="cal-event-sub" style="color:var(--t3)">${esc(obj.notes)}</div>` : ''}
-            </div>
-            <div style="flex-shrink:0">
-              <div class="cal-event-time">${fmtTime(obj.departure_time)}</div>
-              <div class="cal-event-time-sub">→ ${fmtTime(obj.arrival_time)}</div>
-              <div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end">
-                <button class="btn-g btn-sm" onclick="openEditVol('${obj.id}')">Modifier</button>
-                <button class="btn-d" onclick="deleteVol('${obj.id}')">Supprimer</button>
-              </div>
-            </div>
-          </div>`;
-        } else {
-          return `<div class="cal-event sim">
-            <div style="min-width:0">
-              <div class="cal-event-kind sim">Simulateur</div>
-              <div class="cal-event-title">${esc(obj.client_name||'—')}</div>
-              <div class="cal-event-sub">${esc(obj.session_type||'')}${obj.client_origin?' · '+esc(obj.client_origin):''}</div>
-              <div class="cal-event-sub">Responsable : ${esc(pilotName(obj.handler_id))}</div>
-              ${obj.notes ? `<div class="cal-event-sub" style="color:var(--t3)">${esc(obj.notes)}</div>` : ''}
-            </div>
-            <div style="flex-shrink:0">
-              <div class="cal-event-time">${(obj.start_time||'').slice(0,5)} – ${(obj.end_time||'').slice(0,5)}</div>
-              ${obj.amount ? `<div class="cal-event-time-sub">${obj.amount} €</div>` : ''}
-              <div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end">
-                <button class="btn-g btn-sm" onclick="openEditSim('${obj.id}')">Modifier</button>
-                <button class="btn-d" onclick="deleteSim('${obj.id}')">Supprimer</button>
-              </div>
-            </div>
-          </div>`;
-        }
-      }).join('');
+  const t = S.planTab;
+  const dayFlights = S.flights.filter(f => f.departure_time?.startsWith(S.planDate));
+  const daySims = S.sims.filter(s => s.date === S.planDate);
 
   c.innerHTML = `
-    <div class="ph" style="margin-bottom:20px">
+    <div class="ph">
       <h1>Planning</h1>
       <div class="row">
-        <button class="btn" onclick="S.planDate=todayStr();renderPlanning()">Aujourd'hui</button>
+        <input type="date" value="${S.planDate}" onchange="S.planDate=this.value;renderPlanning()" style="padding:8px 12px;border-radius:8px;border:1px solid var(--border);font-family:'DM Sans',sans-serif;font-size:14px;background:var(--bg);color:var(--text);outline:none">
+        <button class="btn" onclick="${t==='vols'?'openNewVol()':'openNewSim()'}">+ Ajouter</button>
       </div>
     </div>
 
-    <div class="cal-month-header">
-      <div class="cal-month-title">${MONTHS[selM-1]} ${selY}</div>
-      <div class="row">
-        <button class="btn-g" onclick="changeMonth(-1)">‹</button>
-        <button class="btn-g" onclick="changeMonth(1)">›</button>
-      </div>
+    <div class="tabs">
+      <button class="tab ${t==='vols'?'on':''}" onclick="S.planTab='vols';renderPlanning()">Vols</button>
+      <button class="tab ${t==='sim'?'on':''}" onclick="S.planTab='sim';renderPlanning()">Simulateur</button>
     </div>
 
-    <div class="cal-legend">
-      <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#2563EB"></div>Vol</div>
-      <div class="cal-legend-item"><div class="cal-legend-dot" style="background:#7C3AED"></div>Simulateur</div>
-    </div>
-
-    <div class="cal-grid">${calCells}</div>
-
-    <div class="cal-day-detail">
-      <div class="cal-day-detail-head">
-        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:16px;color:var(--navy)">${cap(selDateLabel)}</div>
-        <div class="row">
-          <button class="btn-g btn-sm" onclick="openNewVol()">+ Vol</button>
-          <button class="btn" onclick="openNewSim()" style="background:#7C3AED">+ Sim</button>
-        </div>
-      </div>
-      ${eventsHTML}
-    </div>
+    ${t === 'vols' ? (
+      dayFlights.length === 0 ? '<div class="empty">Aucun vol ce jour</div>' :
+      dayFlights.map(f => `
+        <div class="li" style="align-items:flex-start">
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap">
+              <span class="li-title">${esc(f.departure)} → ${esc(f.arrival)}</span>
+              <span class="badge" style="background:var(--navy-pale);color:var(--navy)">${esc(f.flight_type)}</span>
+            </div>
+            <div class="li-sub">${esc(aircraftName(f.aircraft_id))} · ${esc(pilotName(f.pilot_id))}</div>
+            ${f.notes ? `<div style="font-size:13px;color:var(--t3);margin-top:4px">${esc(f.notes)}</div>` : ''}
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-weight:700;font-size:15px;color:var(--navy)">${fmtTime(f.departure_time)}</div>
+            <div style="font-size:13px;color:var(--t2)">→ ${fmtTime(f.arrival_time)}</div>
+            <div class="li-actions" style="margin-top:8px;justify-content:flex-end">
+              <button class="btn-g btn-sm" onclick="openEditVol('${f.id}')">Modifier</button>
+              <button class="btn-d" onclick="deleteVol('${f.id}')">Supprimer</button>
+            </div>
+          </div>
+        </div>`).join('')
+    ) : (
+      daySims.length === 0 ? '<div class="empty">Aucune séance simulateur ce jour</div>' :
+      daySims.map(s => `
+        <div class="li" style="align-items:flex-start">
+          <div>
+            <div class="li-title">${esc(s.client_name||'—')}</div>
+            <div class="li-sub">${esc(s.session_type||'')} · Origine : ${esc(s.client_origin||'—')}</div>
+            <div class="li-sub">Responsable : ${esc(pilotName(s.handler_id))}</div>
+            ${s.notes ? `<div style="font-size:13px;color:var(--t3);margin-top:4px">${esc(s.notes)}</div>` : ''}
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-weight:700;font-size:15px">${(s.start_time||'').slice(0,5)} – ${(s.end_time||'').slice(0,5)}</div>
+            ${s.amount ? `<div style="color:var(--navy);font-weight:600;font-size:15px">${s.amount} €</div>` : ''}
+            <div class="li-actions" style="margin-top:8px;justify-content:flex-end">
+              <button class="btn-g btn-sm" onclick="openEditSim('${s.id}')">Modifier</button>
+              <button class="btn-d" onclick="deleteSim('${s.id}')">Supprimer</button>
+            </div>
+          </div>
+        </div>`).join('')
+    )}
   `;
-}
-
-function changeMonth(delta) {
-  const [y, m] = S.planDate.split('-').map(Number);
-  const newDate = new Date(y, m - 1 + delta, 1);
-  S.planDate = newDate.toISOString().split('T')[0];
-  renderPlanning();
 }
 
 /* VOL MODALS */
@@ -1082,6 +957,732 @@ async function signManex(docId, pilotId) {
 }
 
 /* ═══════════════════════════════════════════
+   PAGE: FORMULAIRES
+═══════════════════════════════════════════ */
+const FORM_TABS = [
+  { id:'fr',  label:'Flight Release' },
+  { id:'mc',  label:'Masse & Centrage' },
+  { id:'rex', label:'REX' },
+  { id:'tl',  label:'Tech-Log' },
+  { id:'si',  label:'Signalement' },
+  { id:'nav', label:'Nav Log' },
+];
+
+function renderFormulaires() {
+  const c = document.getElementById('content');
+  const t = S.formTab;
+  const savedForms = S.forms.filter(f => f.type === t);
+
+  const tabHtml = FORM_TABS.map(tab =>
+    `<button class="tab ${t===tab.id?'on':''}" onclick="S.formTab='${tab.id}';renderFormulaires()">${tab.label}</button>`
+  ).join('');
+
+  const historyHtml = savedForms.length === 0
+    ? `<div class="empty" style="margin-top:12px">Aucun formulaire enregistré</div>`
+    : savedForms.map(f => `
+      <div class="alert-li navy" style="margin-bottom:8px">
+        <div>
+          <div style="font-weight:600;font-size:14px">${esc(f.ref_number||'—')} <span style="font-weight:400;color:var(--t2);font-size:13px">— ${esc(f.pilot_name||'')}</span></div>
+          <div style="font-size:12px;color:var(--t3);margin-top:2px">${fmtDate(f.submitted_at)} · ${esc(f.departure||'')}${f.arrival?' → '+esc(f.arrival):''}</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sm" onclick="exportFormPDF('${f.id}')">PDF</button>
+          <button class="btn-d" onclick="deleteForm('${f.id}')">✕</button>
+        </div>
+      </div>`).join('');
+
+  c.innerHTML = `
+    <div class="ph">
+      <div><h1>Formulaires</h1><div class="pg-sub">Formulaires réglementaires MANEX HOVE-OM</div></div>
+      <button class="btn" onclick="openFormModal('${t}')">+ Nouveau ${FORM_TABS.find(x=>x.id===t)?.label||''}</button>
+    </div>
+    <div class="tabs" style="overflow-x:auto;flex-wrap:nowrap">${tabHtml}</div>
+    <span class="sec-label">Formulaires enregistrés</span>
+    ${historyHtml}
+  `;
+}
+
+function openFormModal(type) {
+  const labels = { fr:'Flight Release — FR-HOVE-01', mc:'Masse & Centrage — MC-HOVE-01', rex:'REX — REX-HOVE-01', tl:'Tech-Log — TL-HOVE-01', si:'Signalement — SI-HOVE-01', nav:'Navigation Log — FRO-HOVE-01' };
+  const builders = { fr: formFR, mc: formMC, rex: formREX, tl: formTL, si: formSI, nav: formNAV };
+  openModal(labels[type]||type, (builders[type]||(() => '<p>À venir</p>'))());
+}
+
+// ── Helpers ──────────────────────────────
+function gonogoRow(label, id) {
+  return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap">
+    <span style="font-size:13px;flex:1">${label}</span>
+    <div style="display:flex;gap:8px">
+      <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="${id}" value="GO"> <span style="color:var(--green);font-weight:600">GO</span></label>
+      <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="radio" name="${id}" value="NO-GO"> <span style="color:var(--red);font-weight:600">NO-GO</span></label>
+    </div>
+  </div>`;
+}
+function satRow(label, id) {
+  return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);gap:8px;flex-wrap:wrap">
+    <span style="font-size:12px;flex:1">${label}</span>
+    <div style="display:flex;gap:8px">
+      <label style="font-size:12px;cursor:pointer"><input type="radio" name="${id}" value="SAT"> <span style="color:var(--green);font-weight:600">SAT</span></label>
+      <label style="font-size:12px;cursor:pointer"><input type="radio" name="${id}" value="UNSAT"> <span style="color:var(--red);font-weight:600">UNSAT</span></label>
+    </div>
+  </div>`;
+}
+function secTitle(t) { return `<div style="font-family:'Syne',sans-serif;font-weight:700;font-size:13px;color:var(--navy);background:var(--navy-pale);padding:8px 12px;border-radius:8px;margin:16px 0 8px;letter-spacing:.3px">${t}</div>`; }
+function pilotOpts() { return S.pilots.map(p=>`<option value="${p.first_name} ${p.last_name}">${esc(p.first_name)} ${esc(p.last_name)}</option>`).join(''); }
+
+// ── FLIGHT RELEASE ───────────────────────
+function formFR() {
+  const now = new Date();
+  const dateUTC = now.toISOString().split('T')[0];
+  return `
+    ${secTitle('IDENTIFICATION DU VOL')}
+    <div class="g2">
+      <div class="field"><label>Date UTC</label><input id="fr-date" type="date" value="${dateUTC}"></div>
+      <div class="field"><label>ETD UTC</label><input id="fr-etd" type="time"></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Départ ICAO</label><input id="fr-dep" placeholder="LFPG"></div>
+      <div class="field"><label>Destination ICAO</label><input id="fr-arr" placeholder="LFLY"></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Dégagement ICAO</label><input id="fr-alt" placeholder="LFMN"></div>
+      <div class="field"><label>CDB / PIC</label><select id="fr-cdb"><option value="">Choisir...</option>${pilotOpts()}</select></div>
+    </div>
+    <div class="field"><label>Type de vol</label>
+      <select id="fr-type"><option>Voyage</option><option>Entraînement</option><option>Convoyage</option><option>Maintenance</option></select>
+    </div>
+
+    ${secTitle('§A — MASSE & CENTRAGE')}
+    ${gonogoRow('MTOW ≤ 1 633 kg respectée & CG dans enveloppe AFM', 'fr-a1')}
+    <div class="g2" style="margin-top:8px">
+      <div class="field"><label>Masse TOW (kg)</label><input id="fr-tow" type="number" placeholder="ex: 1580"></div>
+      <div class="field"><label>CG décollage (pouces)</label><input id="fr-cg" type="number" placeholder="ex: 139.2"></div>
+    </div>
+
+    ${secTitle('§B — MÉTÉOROLOGIE')}
+    ${gonogoRow('Météo départ ≥ minima HOVE (VFR: vis≥5km, pla≥1500ft / IFR: publiés+200ft/800m)', 'fr-b1')}
+    ${gonogoRow('Météo destination ≥ minima', 'fr-b2')}
+    ${gonogoRow('Météo dégagement ≥ minima publiés', 'fr-b3')}
+    ${gonogoRow('Aucun SIGMET actif non mitigé', 'fr-b4')}
+    ${gonogoRow('Turbulences ≤ modérées', 'fr-b5')}
+    <div class="field" style="margin-top:8px"><label>Source météo</label>
+      <select id="fr-meteo"><option>Météo-France Aviation</option><option>SkyDemon</option><option>AviationWeather</option><option>Autre</option></select>
+    </div>
+
+    ${secTitle('§C — TECH-LOG & NAVIGABILITÉ')}
+    ${gonogoRow('ARC valide', 'fr-c1')}
+    ${gonogoRow('Aucune échéance 50h / 100h dépassée', 'fr-c2')}
+    ${gonogoRow('MEL vérifiée — aucun NO-GO item inopérant', 'fr-c3')}
+    ${gonogoRow('CAPS armé, pin retiré, échéance valide', 'fr-c4')}
+    ${gonogoRow('TKS/FIKI niveau fluide OK si givrage possible', 'fr-c5')}
+    ${gonogoRow('Aucune AN catégorie A non clôturée', 'fr-c6')}
+    ${gonogoRow('Carburant confirmé', 'fr-c7')}
+    <div class="field" style="margin-top:8px"><label>Heures cellule (TT)</label><input id="fr-tt" type="number" placeholder="ex: 1250"></div>
+
+    ${secTitle('§D — PILOTE FIT')}
+    ${gonogoRow('Repos ≥ 8h dans les 24h précédant le vol', 'fr-d1')}
+    ${gonogoRow('Aucun médicament incompatible', 'fr-d2')}
+    ${gonogoRow('Aucune pathologie aiguë', 'fr-d3')}
+    ${gonogoRow('Alcool 0,00 g/L — délai ≥ 12h', 'fr-d4')}
+    ${gonogoRow('État psychologique nominal', 'fr-d5')}
+    ${gonogoRow('KSS ≤ 6', 'fr-d6')}
+    <div class="field" style="margin-top:8px"><label>Score KSS (1-9)</label><input id="fr-kss" type="number" min="1" max="9" placeholder="ex: 3"></div>
+
+    ${secTitle('§E — CARBURANT & PLAN DE VOL')}
+    <div class="g2">
+      <div class="field"><label>Carburant trajet (kg)</label><input id="fr-fuel1" type="number"></div>
+      <div class="field"><label>Contingence +10% (kg)</label><input id="fr-fuel2" type="number"></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Dégagement (kg)</label><input id="fr-fuel3" type="number"></div>
+      <div class="field"><label>Réserve finale 45' (kg)</label><input id="fr-fuel4" type="number"></div>
+    </div>
+    ${gonogoRow('Plan de vol IFR déposé', 'fr-e1')}
+    ${gonogoRow('NOTAMs vérifiés (départ, route, destination, dégagement)', 'fr-e2')}
+    <div class="field" style="margin-top:8px"><label>Référence IFPS</label><input id="fr-ifps" placeholder="ex: AS12345678"></div>
+
+    ${secTitle('DÉCISION FINALE')}
+    <div style="display:flex;gap:12px;margin-bottom:12px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px;font-weight:600;color:var(--green)"><input type="radio" name="fr-dec" value="GO"> ✅ VOL AUTORISÉ — GO</label>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px;font-weight:600;color:var(--red)"><input type="radio" name="fr-dec" value="NO-GO"> 🚫 VOL SUSPENDU — NO-GO</label>
+    </div>
+    <div class="field"><label>Motif / dérogation DO (si NO-GO)</label><textarea id="fr-motif" rows="2" placeholder="Motif détaillé..."></textarea></div>
+
+    <div class="m-foot">
+      <button class="btn-g" onclick="closeModal()">Annuler</button>
+      <button class="btn" onclick="saveForm('fr')">Enregistrer & Signer</button>
+    </div>`;
+}
+
+// ── MASSE & CENTRAGE ─────────────────────
+function formMC() {
+  const dateUTC = new Date().toISOString().split('T')[0];
+  return `
+    ${secTitle('IDENTIFICATION')}
+    <div class="g2">
+      <div class="field"><label>Date UTC</label><input id="mc-date" type="date" value="${dateUTC}"></div>
+      <div class="field"><label>CDB</label><select id="mc-cdb"><option value="">Choisir...</option>${pilotOpts()}</select></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Départ ICAO</label><input id="mc-dep" placeholder="LFPG"></div>
+      <div class="field"><label>Destination ICAO</label><input id="mc-arr" placeholder="LFLY"></div>
+    </div>
+
+    ${secTitle('TABLEAU DE CHARGEMENT — SR22 G7+')}
+    <div style="font-size:12px;color:var(--t2);margin-bottom:8px">Bras de référence en pouces (AFM Sec.6) — densité AVGAS: 0,72 kg/L</div>
+    <div class="g2">
+      <div class="field"><label>Masse à vide équipée BEW (kg)</label><input id="mc-bew" type="number" placeholder="ex: 1089"></div>
+      <div class="field"><label>Bras BEW (pouces)</label><input id="mc-bewb" type="number" placeholder="ex: 138.5"></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Pilote avant gauche (kg)</label><input id="mc-p1" type="number" placeholder="ex: 85"></div>
+      <div class="field"><label>Copilote / PAX avant droit (kg)</label><input id="mc-p2" type="number" placeholder="ex: 75"></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>PAX arrière gauche (kg)</label><input id="mc-p3" type="number" placeholder="0"></div>
+      <div class="field"><label>PAX arrière droit (kg)</label><input id="mc-p4" type="number" placeholder="0"></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Bagages soute (kg)</label><input id="mc-bag" type="number" placeholder="0"></div>
+      <div class="field"><label>Carburant décollage (litres)</label><input id="mc-fuel" type="number" placeholder="ex: 180" oninput="calcMC()"></div>
+    </div>
+
+    ${secTitle('RÉSULTATS CALCULÉS')}
+    <div id="mc-results" style="background:var(--navy-pale);border-radius:10px;padding:14px;font-size:13px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>ZFW : <strong id="mc-zfw">—</strong> kg</div>
+        <div>TOW : <strong id="mc-tow">—</strong> kg</div>
+        <div>CG décollage : <strong id="mc-cgto">—</strong> po</div>
+        <div>CG atterrissage : <strong id="mc-cgld">—</strong> po</div>
+      </div>
+      <div id="mc-verdict" style="margin-top:10px;font-weight:700;font-size:13px">—</div>
+    </div>
+    <button class="btn-g" style="margin-top:8px;width:100%" onclick="calcMC()">🔄 Calculer</button>
+
+    <div class="m-foot" style="margin-top:16px">
+      <button class="btn-g" onclick="closeModal()">Annuler</button>
+      <button class="btn" onclick="saveForm('mc')">Enregistrer & Signer</button>
+    </div>`;
+}
+
+function calcMC() {
+  const g = id => parseFloat(document.getElementById(id)?.value||0)||0;
+  const bew = g('mc-bew'), bewb = g('mc-bewb');
+  const p1=g('mc-p1'), p2=g('mc-p2'), p3=g('mc-p3'), p4=g('mc-p4'), bag=g('mc-bag');
+  const fuelL=g('mc-fuel'), fuelKg=fuelL*0.72;
+  const zfw = bew+p1+p2+p3+p4+bag;
+  const tow = zfw+fuelKg;
+  const momZFW = bew*bewb + p1*143 + p2*143 + p3*177 + p4*177 + bag*208.3;
+  const momTOW = momZFW + fuelKg*150;
+  const cgTO = tow>0 ? (momTOW/tow).toFixed(2) : '—';
+  const fuelLd = fuelKg - (fuelKg*0.15); // approx consumed
+  const lw = zfw + fuelLd;
+  const momLD = momZFW + fuelLd*150;
+  const cgLD = lw>0 ? (momLD/lw).toFixed(2) : '—';
+  const ok = tow<=1633 && cgTO>=137.5 && cgTO<=141.0;
+  document.getElementById('mc-zfw').textContent = zfw.toFixed(1);
+  document.getElementById('mc-tow').textContent = tow.toFixed(1);
+  document.getElementById('mc-cgto').textContent = cgTO;
+  document.getElementById('mc-cgld').textContent = cgLD;
+  const v = document.getElementById('mc-verdict');
+  if(tow>0) {
+    v.style.color = ok?'var(--green)':'var(--red)';
+    v.textContent = ok ? '✅ DANS L\'ENVELOPPE — GO' : `🚫 HORS LIMITES — NO-GO${tow>1633?' (MTOW dépassée)':''}${cgTO<137.5||cgTO>141.0?' (CG hors enveloppe)':''}`;
+  }
+}
+
+// ── REX ──────────────────────────────────
+function formREX() {
+  const dateUTC = new Date().toISOString().split('T')[0];
+  return `
+    ${secTitle('SECTION 1 — IDENTIFICATION')}
+    <div class="g2">
+      <div class="field"><label>Date événement UTC</label><input id="rex-date" type="date" value="${dateUTC}"></div>
+      <div class="field"><label>Pilote déclarant</label><select id="rex-pilot"><option value="">Choisir...</option>${pilotOpts()}</select></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Départ ICAO</label><input id="rex-dep" placeholder="LFPG"></div>
+      <div class="field"><label>Destination ICAO</label><input id="rex-arr" placeholder="LFLY"></div>
+    </div>
+    <div class="field"><label>Phase de vol</label>
+      <select id="rex-phase"><option>Sol</option><option>Décollage</option><option>En route</option><option>Approche</option><option>Atterrissage</option></select>
+    </div>
+    <div class="field"><label>N° FR associé</label><input id="rex-fr" placeholder="FR-20260411-001"></div>
+
+    ${secTitle('SECTION 2 — CLASSIFICATION')}
+    <div class="field"><label>Catégorie</label>
+      <select id="rex-cat">
+        <option>Incident de navigation / altimétrie</option>
+        <option>Panne système (moteur, avionique, CAPS, FIKI)</option>
+        <option>Situation météo non anticipée</option>
+        <option>Déviation aux SOP / MANEX</option>
+        <option>Fatigue / inaptitude pilote</option>
+        <option>Maintenance / navigabilité</option>
+        <option>Interaction ATC / violation espace</option>
+        <option>Incident passager / cargo</option>
+        <option>Autre</option>
+      </select>
+    </div>
+    <div class="field"><label>Gravité</label>
+      <select id="rex-grav">
+        <option>Niveau 1 — Déviation mineure (débrief interne)</option>
+        <option>Niveau 2 — Déviation significative (REX + FDM)</option>
+        <option>Niveau 3 — Déviation sévère (REX obligatoire + révision SOP)</option>
+        <option>Incident grave (ECCAIRS 2 + BEA requis)</option>
+        <option>Accident (BEA + DGAC notification immédiate)</option>
+      </select>
+    </div>
+
+    ${secTitle('SECTION 3 — DESCRIPTION CHRONOLOGIQUE DES FAITS')}
+    <div class="field"><textarea id="rex-desc" rows="4" placeholder="Décrire les faits objectivement (quoi, quand, où, conditions). Ne pas interpréter."></textarea></div>
+
+    ${secTitle('SECTION 4 — FACTEURS CONTRIBUANTS')}
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      ${['Facteurs humains','Techniques / équipement','Environnement / météo','Réglementation / SOP','Formation','Autres'].map(f=>
+        `<label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer"><input type="checkbox" value="${f}"> ${f}</label>`
+      ).join('')}
+    </div>
+    <div class="field"><textarea id="rex-factors" rows="2" placeholder="Détail des facteurs..."></textarea></div>
+
+    ${secTitle('SECTION 5 — ACTIONS IMMÉDIATES')}
+    <div class="field"><textarea id="rex-actions" rows="3" placeholder="Actions correctrices immédiates, signalements effectués, personnes contactées..."></textarea></div>
+
+    <div class="m-foot">
+      <button class="btn-g" onclick="closeModal()">Annuler</button>
+      <button class="btn" onclick="saveForm('rex')">Enregistrer (J+0)</button>
+    </div>`;
+}
+
+// ── TECH-LOG ─────────────────────────────
+function formTL() {
+  const dateUTC = new Date().toISOString().split('T')[0];
+  return `
+    ${secTitle('A — VALIDATION PRÉ-VOL TECH-LOG')}
+    ${gonogoRow('ARC (Attestation de Navigabilité) en cours de validité', 'tl-a1')}
+    ${gonogoRow('Prochaine inspection 50h — heures disponibles ≥ heures vol planifié', 'tl-a2')}
+    ${gonogoRow('Prochaine inspection 100h / annuelle — non dépassée', 'tl-a3')}
+    ${gonogoRow('CAPS : pin retiré, armé, échéance valide', 'tl-a4')}
+    ${gonogoRow('FIKI/TKS : niveau fluide ≥ 50% si givrage possible', 'tl-a5')}
+    ${gonogoRow('Dérogations MEL actives — aucune échéance dépassée', 'tl-a6')}
+    ${gonogoRow('AN ouvertes — aucune anomalie catégorie A non clôturée', 'tl-a7')}
+    ${gonogoRow('Carburant dernier plein concordant avec LARK (écart ≤ 5%)', 'tl-a8')}
+
+    ${secTitle('B — DONNÉES DU VOL')}
+    <div class="g2">
+      <div class="field"><label>Date UTC</label><input id="tl-date" type="date" value="${dateUTC}"></div>
+      <div class="field"><label>CDB / PIC</label><select id="tl-cdb"><option value="">Choisir...</option>${pilotOpts()}</select></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Départ ICAO</label><input id="tl-dep" placeholder="LFPG"></div>
+      <div class="field"><label>Destination ICAO</label><input id="tl-arr" placeholder="LFLY"></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Heure décollage UTC (OFF)</label><input id="tl-off" type="time"></div>
+      <div class="field"><label>Heure atterrissage UTC (ON)</label><input id="tl-on" type="time"></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Heures cellule départ</label><input id="tl-tts" type="number" placeholder="ex: 1250.5"></div>
+      <div class="field"><label>Heures cellule arrivée</label><input id="tl-tta" type="number" placeholder="ex: 1252.3"></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Carburant embarqué (L)</label><input id="tl-fuel" type="number"></div>
+      <div class="field"><label>Carburant restant arrivée (L)</label><input id="tl-fuelr" type="number"></div>
+    </div>
+    <div class="field"><label>Nombre de PAX</label><input id="tl-pax" type="number" placeholder="0"></div>
+
+    ${secTitle('C — ANOMALIES CONSTATÉES')}
+    <div style="margin-bottom:10px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="tl-ano" value="RAS" checked> <strong>Aucune anomalie — RAS</strong></label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;margin-top:6px;cursor:pointer"><input type="radio" name="tl-ano" value="ANOMALIE"> Anomalie(s) constatée(s)</label>
+    </div>
+    <div class="field"><textarea id="tl-anomalie" rows="3" placeholder="Description anomalie (catégorie A/B/C selon MEL)..."></textarea></div>
+
+    <div class="m-foot">
+      <button class="btn-g" onclick="closeModal()">Annuler</button>
+      <button class="btn" onclick="saveForm('tl')">Enregistrer & Signer</button>
+    </div>`;
+}
+
+// ── SIGNALEMENT INTERNE ──────────────────
+function formSI() {
+  const dateUTC = new Date().toISOString().split('T')[0];
+  return `
+    ${secTitle('IDENTIFICATION')}
+    <div class="g2">
+      <div class="field"><label>Date UTC</label><input id="si-date" type="date" value="${dateUTC}"></div>
+      <div class="field"><label>Déclarant</label><select id="si-pilot"><option value="">Choisir / Anonyme</option>${pilotOpts()}</select></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>N° FR associé</label><input id="si-fr" placeholder="FR-20260411-001"></div>
+      <div class="field"><label>Déclaration</label>
+        <select id="si-anon"><option value="nominatif">Nominative</option><option value="anonyme">Anonyme (protégée Règl. 376/2014)</option></select>
+      </div>
+    </div>
+
+    ${secTitle('NATURE DE L\'ÉVÉNEMENT')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px">
+      ${['Incident de vol (panne, situation anormale)','Déviation aux SOP / MANEX','Fatigue / inaptitude déclarée','Conflit / pression externe sur décision pilote','Non-conformité maintenance / navigabilité','Événement météo non prévu','Incident passager / comportement','Erreur ATC / instruction douteuse','Défaut de documentation','Autre'].map(n=>
+        `<label style="display:flex;align-items:center;gap-4px;font-size:12px;cursor:pointer;gap:4px"><input type="checkbox" value="${n}"> ${n}</label>`
+      ).join('')}
+    </div>
+
+    ${secTitle('DESCRIPTION DES FAITS')}
+    <div class="field"><textarea id="si-desc" rows="4" placeholder="Décrire les faits objectivement. Ne pas interpréter. Mentionner : quoi, quand, où, dans quelles conditions, qui d'autre était impliqué."></textarea></div>
+
+    ${secTitle('GRAVITÉ & DÉCLARATION RÉGLEMENTAIRE')}
+    <div class="field"><label>Gravité estimée</label>
+      <select id="si-grav">
+        <option>Faible (information interne uniquement)</option>
+        <option>Modérée (REX à ouvrir dans 24h)</option>
+        <option>Élevée (REX obligatoire + notification DO immédiate)</option>
+      </select>
+    </div>
+    <div class="field"><label>ECCAIRS 2 / BEA requis ?</label>
+      <select id="si-eccairs"><option value="non">NON</option><option value="oui">OUI — Délai : 72h (Règl. UE 376/2014)</option></select>
+    </div>
+
+    ${secTitle('SUGGESTIONS DU DÉCLARANT (facultatif)')}
+    <div class="field"><textarea id="si-sugg" rows="2" placeholder="Suggestions d'amélioration..."></textarea></div>
+
+    <div class="m-foot">
+      <button class="btn-g" onclick="closeModal()">Annuler</button>
+      <button class="btn" onclick="saveForm('si')">Enregistrer</button>
+    </div>`;
+}
+
+// ── NAVIGATION LOG ───────────────────────
+function formNAV() {
+  const dateUTC = new Date().toISOString().split('T')[0];
+  return `
+    ${secTitle('IDENTIFICATION DU VOL')}
+    <div class="g2">
+      <div class="field"><label>Date UTC</label><input id="nav-date" type="date" value="${dateUTC}"></div>
+      <div class="field"><label>CDB</label><select id="nav-cdb"><option value="">Choisir...</option>${pilotOpts()}</select></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Départ ICAO</label><input id="nav-dep" placeholder="LFPG"></div>
+      <div class="field"><label>Destination ICAO</label><input id="nav-arr" placeholder="LFLY"></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Dégagement ICAO</label><input id="nav-alt" placeholder="LFMN"></div>
+      <div class="field"><label>Type nav.</label>
+        <select id="nav-type"><option>IFR</option><option>VFR</option></select>
+      </div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Niveau de vol / FL</label><input id="nav-fl" placeholder="FL120"></div>
+      <div class="field"><label>Vitesse TAS (kts)</label><input id="nav-tas" type="number" placeholder="160"></div>
+    </div>
+
+    ${secTitle('CARBURANT')}
+    <div class="g2">
+      <div class="field"><label>Carburant embarqué (L)</label><input id="nav-fuel-emb" type="number"></div>
+      <div class="field"><label>Trajet (L)</label><input id="nav-fuel-traj" type="number"></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Contingence (L)</label><input id="nav-fuel-cont" type="number"></div>
+      <div class="field"><label>Dégagement (L)</label><input id="nav-fuel-deg" type="number"></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Réserve 45' (L)</label><input id="nav-fuel-res" type="number"></div>
+      <div class="field"><label>Consommé réel (L)</label><input id="nav-fuel-reel" type="number"></div>
+    </div>
+
+    ${secTitle('WAYPOINTS PRINCIPAUX')}
+    <div class="field"><label>Route (waypoints séparés par virgules)</label>
+      <input id="nav-route" placeholder="ex: LFPG, ODRAN, RANUX, LFLY"></div>
+
+    ${secTitle('MÉTÉO EN ROUTE — NOTES')}
+    <div class="field"><textarea id="nav-meteo" rows="2" placeholder="Conditions météo en route, SIGMETs, turbulences..."></textarea></div>
+
+    <div class="m-foot">
+      <button class="btn-g" onclick="closeModal()">Annuler</button>
+      <button class="btn" onclick="saveForm('nav')">Enregistrer & Signer</button>
+    </div>`;
+}
+
+// ── SAVE FORM ─────────────────────────────
+function getRadio(name) {
+  const el = document.querySelector(`input[name="${name}"]:checked`);
+  return el ? el.value : '—';
+}
+function getFieldVal(id) {
+  const el = document.getElementById(id);
+  return el ? el.value.trim() : '';
+}
+
+async function saveForm(type) {
+  const now = new Date();
+  const ts = now.toISOString();
+  const prefixes = { fr:'FR', mc:'MC', rex:'REX', tl:'TL', si:'SI', nav:'FRO' };
+  const dateTag = now.toISOString().slice(0,10).replace(/-/g,'');
+  const seq = String(S.forms.filter(f=>f.type===type).length+1).padStart(3,'0');
+  const refNumber = `${prefixes[type]}-HOVE-${dateTag}-${seq}`;
+
+  const getters = {
+    fr: () => ({
+      date: getFieldVal('fr-date'), etd: getFieldVal('fr-etd'),
+      departure: getFieldVal('fr-dep'), arrival: getFieldVal('fr-arr'),
+      alternate: getFieldVal('fr-alt'), pilot_name: getFieldVal('fr-cdb'),
+      flight_type: getFieldVal('fr-type'), tow: getFieldVal('fr-tow'), cg: getFieldVal('fr-cg'),
+      meteo_source: getFieldVal('fr-meteo'), tt: getFieldVal('fr-tt'),
+      kss: getFieldVal('fr-kss'), ifps: getFieldVal('fr-ifps'),
+      decision: getRadio('fr-dec'), motif: getFieldVal('fr-motif'),
+      sec_a: getRadio('fr-a1'), sec_b: [1,2,3,4,5].map(i=>getRadio(`fr-b${i}`)).join(','),
+      sec_c: [1,2,3,4,5,6,7].map(i=>getRadio(`fr-c${i}`)).join(','),
+      sec_d: [1,2,3,4,5,6].map(i=>getRadio(`fr-d${i}`)).join(','),
+      sec_e: [1,2].map(i=>getRadio(`fr-e${i}`)).join(','),
+      fuel_traj: getFieldVal('fr-fuel1'), fuel_cont: getFieldVal('fr-fuel2'),
+      fuel_alt: getFieldVal('fr-fuel3'), fuel_res: getFieldVal('fr-fuel4'),
+    }),
+    mc: () => ({
+      date: getFieldVal('mc-date'), pilot_name: getFieldVal('mc-cdb'),
+      departure: getFieldVal('mc-dep'), arrival: getFieldVal('mc-arr'),
+      bew: getFieldVal('mc-bew'), bew_arm: getFieldVal('mc-bewb'),
+      p1: getFieldVal('mc-p1'), p2: getFieldVal('mc-p2'), p3: getFieldVal('mc-p3'), p4: getFieldVal('mc-p4'),
+      baggage: getFieldVal('mc-bag'), fuel_liters: getFieldVal('mc-fuel'),
+      zfw: document.getElementById('mc-zfw')?.textContent||'',
+      tow: document.getElementById('mc-tow')?.textContent||'',
+      cg_to: document.getElementById('mc-cgto')?.textContent||'',
+      cg_ld: document.getElementById('mc-cgld')?.textContent||'',
+      verdict: document.getElementById('mc-verdict')?.textContent||'',
+    }),
+    rex: () => ({
+      date: getFieldVal('rex-date'), pilot_name: getFieldVal('rex-pilot'),
+      departure: getFieldVal('rex-dep'), arrival: getFieldVal('rex-arr'),
+      phase: getFieldVal('rex-phase'), fr_ref: getFieldVal('rex-fr'),
+      category: getFieldVal('rex-cat'), severity: getFieldVal('rex-grav'),
+      description: getFieldVal('rex-desc'), factors: getFieldVal('rex-factors'),
+      immediate_actions: getFieldVal('rex-actions'),
+    }),
+    tl: () => ({
+      date: getFieldVal('tl-date'), pilot_name: getFieldVal('tl-cdb'),
+      departure: getFieldVal('tl-dep'), arrival: getFieldVal('tl-arr'),
+      off_time: getFieldVal('tl-off'), on_time: getFieldVal('tl-on'),
+      tt_start: getFieldVal('tl-tts'), tt_end: getFieldVal('tl-tta'),
+      fuel_loaded: getFieldVal('tl-fuel'), fuel_remaining: getFieldVal('tl-fuelr'),
+      pax: getFieldVal('tl-pax'), anomaly_status: getRadio('tl-ano'),
+      anomaly_desc: getFieldVal('tl-anomalie'),
+      preflight: [1,2,3,4,5,6,7,8].map(i=>getRadio(`tl-a${i}`)).join(','),
+    }),
+    si: () => ({
+      date: getFieldVal('si-date'), pilot_name: getFieldVal('si-pilot'),
+      fr_ref: getFieldVal('si-fr'), anonymous: getFieldVal('si-anon'),
+      description: getFieldVal('si-desc'), severity: getFieldVal('si-grav'),
+      eccairs: getFieldVal('si-eccairs'), suggestions: getFieldVal('si-sugg'),
+    }),
+    nav: () => ({
+      date: getFieldVal('nav-date'), pilot_name: getFieldVal('nav-cdb'),
+      departure: getFieldVal('nav-dep'), arrival: getFieldVal('nav-arr'),
+      alternate: getFieldVal('nav-alt'), nav_type: getFieldVal('nav-type'),
+      fl: getFieldVal('nav-fl'), tas: getFieldVal('nav-tas'),
+      route: getFieldVal('nav-route'),
+      fuel_loaded: getFieldVal('nav-fuel-emb'), fuel_traj: getFieldVal('nav-fuel-traj'),
+      fuel_cont: getFieldVal('nav-fuel-cont'), fuel_alt: getFieldVal('nav-fuel-deg'),
+      fuel_res: getFieldVal('nav-fuel-res'), fuel_actual: getFieldVal('nav-fuel-reel'),
+      meteo_notes: getFieldVal('nav-meteo'),
+    }),
+  };
+
+  const data = (getters[type]||(() => ({})))();
+  const record = {
+    type, ref_number: refNumber, submitted_at: ts,
+    pilot_name: data.pilot_name||'—',
+    departure: data.departure||'', arrival: data.arrival||'',
+    data: JSON.stringify(data),
+  };
+
+  try {
+    const r = await db.post('hove_forms', record);
+    const n = first(r);
+    S.forms.unshift(n||{...record, id: 'local-'+Date.now()});
+  } catch(e) {
+    S.forms.unshift({...record, id: 'local-'+Date.now()});
+  }
+  closeModal();
+  renderFormulaires();
+  setTimeout(() => {
+    const latest = S.forms.find(f=>f.ref_number===refNumber);
+    if(latest) exportFormPDF(latest.id, data, type, refNumber);
+  }, 300);
+}
+
+// ── DELETE FORM ───────────────────────────
+async function deleteForm(id) {
+  if (!confirm('Supprimer ce formulaire ?')) return;
+  try { await db.del('hove_forms', id); } catch(e) {}
+  S.forms = S.forms.filter(f => f.id !== id);
+  renderFormulaires();
+}
+
+// ── EXPORT PDF ────────────────────────────
+function exportFormPDF(formId, dataOverride, typeOverride, refOverride) {
+  const form = S.forms.find(f => f.id === formId);
+  if (!form && !dataOverride) return alert('Formulaire introuvable');
+  const data = dataOverride || JSON.parse(form?.data||'{}');
+  const type = typeOverride || form?.type;
+  const ref  = refOverride  || form?.ref_number || '—';
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const W = 210, M = 15;
+  let y = 15;
+
+  const typeLabels = { fr:'FLIGHT RELEASE — FR-HOVE-01', mc:'MASSE & CENTRAGE — MC-HOVE-01', rex:'REX — REX-HOVE-01', tl:'TECH-LOG — TL-HOVE-01', si:'SIGNALEMENT INTERNE — SI-HOVE-01', nav:'NAVIGATION LOG — FRO-HOVE-01' };
+
+  // Header
+  doc.setFillColor(11, 37, 89);
+  doc.rect(0, 0, W, 28, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(15); doc.setFont('helvetica','bold');
+  doc.text('HOVE AVIATION EXECUTIVE', M, 10);
+  doc.setFontSize(10); doc.setFont('helvetica','normal');
+  doc.text(typeLabels[type]||type.toUpperCase(), M, 17);
+  doc.text('NCO — Opérations Non Commerciales — Cirrus SR22 G7+', M, 23);
+  doc.setFontSize(9);
+  doc.text(`Réf: ${ref}`, W-M, 10, {align:'right'});
+  doc.text(`Soumis: ${new Date(form?.submitted_at||Date.now()).toLocaleString('fr-FR')} UTC`, W-M, 16, {align:'right'});
+  doc.text('Éd.01 - Rév.00 · MANEX HOVE-OM · 2026', W-M, 22, {align:'right'});
+
+  y = 36;
+  doc.setTextColor(0,0,0);
+
+  const addSection = (title) => {
+    if (y > 265) { doc.addPage(); y = 15; }
+    doc.setFillColor(238, 242, 250);
+    doc.rect(M, y, W-2*M, 7, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9);
+    doc.setTextColor(11,37,89);
+    doc.text(title.toUpperCase(), M+3, y+5);
+    doc.setTextColor(0,0,0);
+    y += 10;
+  };
+
+  const addRow = (label, value, highlight) => {
+    if (y > 272) { doc.addPage(); y = 15; }
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+    doc.text(label, M, y);
+    doc.setFont('helvetica','bold');
+    if (highlight) {
+      doc.setTextColor(value==='GO'||value==='SAT'||value?.includes('DANS')?0x10:0xEF,
+                       value==='GO'||value==='SAT'||value?.includes('DANS')?0xB9:0x44,
+                       value==='GO'||value==='SAT'||value?.includes('DANS')?0x81:0x44);
+    }
+    doc.text(String(value||'—'), W-M, y, {align:'right'});
+    doc.setTextColor(0,0,0);
+    doc.setDrawColor(228,233,242);
+    doc.line(M, y+1.5, W-M, y+1.5);
+    y += 6;
+  };
+
+  const addTextBlock = (label, text) => {
+    if (y > 260) { doc.addPage(); y = 15; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5);
+    doc.text(label, M, y); y += 5;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8);
+    const lines = doc.splitTextToSize(text||'—', W-2*M);
+    lines.forEach(line => {
+      if (y > 272) { doc.addPage(); y = 15; }
+      doc.text(line, M, y); y += 4.5;
+    });
+    y += 3;
+  };
+
+  // Build PDF content per type
+  if (type === 'fr') {
+    addSection('IDENTIFICATION DU VOL');
+    addRow('Date UTC', data.date); addRow('ETD UTC', data.etd);
+    addRow('Départ', data.departure); addRow('Destination', data.arrival);
+    addRow('Dégagement', data.alternate); addRow('CDB / PIC', data.pilot_name);
+    addRow('Type de vol', data.flight_type); addRow('Immatriculation', 'N151AL');
+    addSection('§A — MASSE & CENTRAGE');
+    addRow('MTOW & CG', data.sec_a, true); addRow('TOW (kg)', data.tow); addRow('CG décollage (po)', data.cg);
+    addSection('§B — MÉTÉOROLOGIE');
+    const bItems = ['Départ','Destination','Dégagement','SIGMETs','Turbulences'];
+    (data.sec_b||'').split(',').forEach((v,i) => addRow(bItems[i]||'', v, true));
+    addRow('Source météo', data.meteo_source);
+    addSection('§C — TECH-LOG & NAVIGABILITÉ');
+    const cItems = ['ARC valide','50h/100h OK','MEL OK','CAPS OK','TKS OK','AN-A clôturées','Carburant OK'];
+    (data.sec_c||'').split(',').forEach((v,i) => addRow(cItems[i]||'', v, true));
+    addRow('Heures cellule TT', data.tt);
+    addSection('§D — PILOTE FIT');
+    const dItems = ['Repos ≥8h','Médicaments OK','Santé OK','Alcool 0,00','Psy OK','KSS ≤6'];
+    (data.sec_d||'').split(',').forEach((v,i) => addRow(dItems[i]||'', v, true));
+    addRow('Score KSS', data.kss);
+    addSection('§E — CARBURANT & PLAN DE VOL');
+    addRow('Carburant trajet (kg)', data.fuel_traj); addRow('Contingence (kg)', data.fuel_cont);
+    addRow('Dégagement (kg)', data.fuel_alt); addRow('Réserve 45\' (kg)', data.fuel_res);
+    const eItems = ['Plan IFR déposé','NOTAMs vérifiés'];
+    (data.sec_e||'').split(',').forEach((v,i) => addRow(eItems[i]||'', v, true));
+    addRow('Réf. IFPS', data.ifps);
+    addSection('DÉCISION FINALE');
+    addRow('DÉCISION', data.decision, true);
+    if (data.motif) addTextBlock('Motif / dérogation DO :', data.motif);
+  } else if (type === 'mc') {
+    addSection('IDENTIFICATION'); addRow('Date UTC', data.date); addRow('CDB', data.pilot_name); addRow('Départ', data.departure); addRow('Destination', data.arrival);
+    addSection('TABLEAU DE CHARGEMENT');
+    addRow('BEW (kg)', data.bew); addRow('Bras BEW (po)', data.bew_arm);
+    addRow('Pilote avant G (kg)', data.p1); addRow('Copilote / PAX avant D (kg)', data.p2);
+    addRow('PAX AR G (kg)', data.p3); addRow('PAX AR D (kg)', data.p4);
+    addRow('Bagages soute (kg)', data.baggage); addRow('Carburant (L)', data.fuel_liters);
+    addSection('RÉSULTATS');
+    addRow('ZFW (kg)', data.zfw); addRow('TOW (kg)', data.tow);
+    addRow('CG décollage (po)', data.cg_to); addRow('CG atterrissage (po)', data.cg_ld);
+    addRow('VERDICT', data.verdict, true);
+  } else if (type === 'rex') {
+    addSection('SECTION 1 — IDENTIFICATION'); addRow('Date UTC', data.date); addRow('Pilote déclarant', data.pilot_name); addRow('Départ', data.departure); addRow('Destination', data.arrival); addRow('Phase de vol', data.phase); addRow('N° FR associé', data.fr_ref);
+    addSection('SECTION 2 — CLASSIFICATION'); addRow('Catégorie', data.category); addRow('Gravité', data.severity, true);
+    addTextBlock('SECTION 3 — DESCRIPTION DES FAITS', data.description);
+    addTextBlock('SECTION 4 — FACTEURS CONTRIBUANTS', data.factors);
+    addTextBlock('SECTION 5 — ACTIONS IMMÉDIATES', data.immediate_actions);
+    addSection('SECTION 7 — CLÔTURE'); addRow('Statut', 'OUVERT');
+    addRow('Pilote déclarant (J+0)', data.pilot_name); addRow('DO — Analyse (J+2)', '— à compléter'); addRow('DR — Validation (J+30)', '— à compléter');
+  } else if (type === 'tl') {
+    addSection('A — PRÉ-VOL');
+    const aItems = ['ARC valide','50h OK','100h/annuelle OK','CAPS OK','TKS OK','MEL OK','AN-A OK','Carburant OK'];
+    (data.preflight||'').split(',').forEach((v,i) => addRow(aItems[i]||'', v, true));
+    addSection('B — DONNÉES DU VOL'); addRow('Date UTC', data.date); addRow('CDB', data.pilot_name); addRow('Départ', data.departure); addRow('Destination', data.arrival); addRow('Décollage UTC', data.off_time); addRow('Atterrissage UTC', data.on_time); addRow('TT départ (h)', data.tt_start); addRow('TT arrivée (h)', data.tt_end); addRow('Carburant embarqué (L)', data.fuel_loaded); addRow('Carburant restant (L)', data.fuel_remaining); addRow('PAX', data.pax);
+    addSection('C — ANOMALIES'); addRow('Statut', data.anomaly_status, true);
+    if (data.anomaly_desc) addTextBlock('Détail anomalies :', data.anomaly_desc);
+  } else if (type === 'si') {
+    addSection('IDENTIFICATION'); addRow('Date UTC', data.date); addRow('Déclarant', data.anonymous==='anonyme'?'ANONYME':data.pilot_name); addRow('N° FR', data.fr_ref); addRow('Type de déclaration', data.anonymous);
+    addTextBlock('DESCRIPTION DES FAITS', data.description);
+    addSection('GRAVITÉ & DÉCLARATION'); addRow('Gravité', data.severity, true); addRow('ECCAIRS / BEA', data.eccairs);
+    if (data.suggestions) addTextBlock('SUGGESTIONS', data.suggestions);
+  } else if (type === 'nav') {
+    addSection('IDENTIFICATION'); addRow('Date UTC', data.date); addRow('CDB', data.pilot_name); addRow('Départ', data.departure); addRow('Destination', data.arrival); addRow('Dégagement', data.alternate); addRow('Type nav.', data.nav_type); addRow('Niveau FL', data.fl); addRow('TAS (kts)', data.tas);
+    addSection('ROUTE'); addRow('Waypoints', data.route);
+    addSection('CARBURANT'); addRow('Embarqué (L)', data.fuel_loaded); addRow('Trajet (L)', data.fuel_traj); addRow('Contingence (L)', data.fuel_cont); addRow('Dégagement (L)', data.fuel_alt); addRow('Réserve 45\' (L)', data.fuel_res); addRow('Consommé réel (L)', data.fuel_actual);
+    if (data.meteo_notes) addTextBlock('MÉTÉO EN ROUTE', data.meteo_notes);
+  }
+
+  // Signature block
+  if (y > 240) { doc.addPage(); y = 15; }
+  y += 5;
+  doc.setDrawColor(11,37,89); doc.setLineWidth(0.3);
+  doc.rect(M, y, W-2*M, 28);
+  doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(11,37,89);
+  doc.text('SIGNATURES', M+3, y+5);
+  doc.setTextColor(0,0,0); doc.setFont('helvetica','normal'); doc.setFontSize(8);
+  doc.text('CDB / PIC', M+5, y+12);
+  doc.text(data.pilot_name||'—', M+5, y+17);
+  doc.text('Signé électroniquement via HOVE OPS', M+5, y+22);
+  doc.text(new Date(form?.submitted_at||Date.now()).toLocaleString('fr-FR')+' UTC', M+5, y+26);
+  doc.line(W/2, y+8, W-M-5, y+8);
+  doc.text('DO / Vérification (si requis)', W/2+2, y+12);
+  doc.text('À compléter si dérogation', W/2+2, y+17);
+
+  // Footer
+  const pages = doc.internal.getNumberOfPages();
+  for (let i=1;i<=pages;i++) {
+    doc.setPage(i);
+    doc.setFontSize(7); doc.setTextColor(150,150,150);
+    doc.text(`CONFIDENTIEL — Usage interne exclusif · HOVE AVIATION EXECUTIVE · ${ref} · Page ${i}/${pages}`, W/2, 292, {align:'center'});
+  }
+
+  doc.save(`${ref}.pdf`);
+}
+
+/* ═══════════════════════════════════════════
    SVG ICONS
 ═══════════════════════════════════════════ */
 function iconGrid() { return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`; }
@@ -1089,6 +1690,7 @@ function iconCal() { return `<svg width="18" height="18" viewBox="0 0 24 24" fil
 function iconPlane() { return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.8 19.2L16 11l3.5-3.5C21 6 21 4 19.5 2.5S18 2 16.5 3.5L13 7 4.8 5.2l-1.4 1.4 7.7 3.6L7.4 14H5l-1 1 3.5 1.5L9 20l1-1v-2.4l3.7-3.7 3.6 7.7z"/></svg>`; }
 function iconUsers() { return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`; }
 function iconShield() { return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`; }
+function iconDoc() { return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`; }
 
 /* ═══════════════════════════════════════════
    INIT
