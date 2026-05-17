@@ -195,6 +195,30 @@ h1{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--navy
 .tl-unavail-block{position:absolute;inset:4px;background:repeating-linear-gradient(45deg,rgba(0,0,0,.04),rgba(0,0,0,.04) 4px,rgba(0,0,0,.08) 4px,rgba(0,0,0,.08) 8px);border-radius:4px;display:flex;align-items:center;justify-content:center}
 .tl-unavail-label{font-size:11px;font-weight:700;color:var(--t3);letter-spacing:.5px}
 
+/* PARA DEPLOYMENT */
+.tl-row.para .tl-row-name{color:var(--amber)}
+.tl-para-badge{display:inline-block;background:#FFFBEB;border:1px solid var(--amber);color:var(--amber);border-radius:4px;font-size:10px;font-weight:600;padding:1px 6px;margin-top:2px;letter-spacing:.3px}
+.tl-para-block{position:absolute;inset:3px;background:linear-gradient(135deg,#F59E0B,#D97706);border-radius:6px;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 10px;box-shadow:0 1px 4px rgba(245,158,11,.3)}
+.tl-para-icon{font-size:14px}
+.tl-para-label{font-size:11px;font-weight:700;color:#fff;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* DOSSIER */
+.dossier-progress{height:6px;background:var(--border);border-radius:3px;margin:8px 0 4px;overflow:hidden}
+.dossier-progress-bar{height:100%;border-radius:3px;background:var(--green);transition:width .3s}
+.dossier-bloc{border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden}
+.dossier-bloc-head{background:var(--navy-pale);padding:10px 14px;display:flex;justify-content:space-between;align-items:center}
+.dossier-bloc-title{font-family:'Syne',sans-serif;font-weight:700;font-size:14px;color:var(--navy)}
+.dossier-bloc-body{padding:10px 14px}
+.dossier-item{display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)}
+.dossier-item:last-child{border-bottom:none}
+.dossier-check{width:18px;height:18px;border-radius:4px;border:2px solid var(--border);flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;margin-top:1px;transition:all .15s}
+.dossier-check.done{background:var(--green);border-color:var(--green)}
+.dossier-item-text{font-size:13px;color:var(--text);line-height:1.4;flex:1}
+.dossier-item-text.done{color:var(--t3);text-decoration:line-through}
+.dossier-badge-ok{display:inline-block;background:var(--green-p);color:var(--green);border-radius:6px;font-size:11px;font-weight:700;padding:2px 8px}
+.dossier-badge-pending{display:inline-block;background:var(--amber-p);color:var(--amber);border-radius:6px;font-size:11px;font-weight:700;padding:2px 8px}
+.sim-instr-btn{background:var(--amber-p);color:var(--amber);border:1px solid var(--amber);border-radius:6px;padding:3px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif}
+
 /* EVENT TYPE PICKER */
 .ev-type-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}
 .ev-type-btn{padding:14px 12px;border-radius:10px;border:2px solid var(--border);background:var(--bg);cursor:pointer;text-align:center;transition:all .15s;font-family:'DM Sans',sans-serif}
@@ -337,6 +361,8 @@ const S = {
   forms: [],
   ofpStep: 1, ofpData: {}, ofpMap: null, ofpTab: 'new',
   pilotUnavail: {}, // { 'pilotId:YYYY-MM-DD': true }
+  pilotPara: JSON.parse(localStorage.getItem('hove_pilotPara') || '{}'), // { 'pilotId:YYYY-MM-DD': 'Club name' }
+  pilotDossiers: JSON.parse(localStorage.getItem('hove_pilotDossiers') || '{}'), // { pilotId: { item_key: true } }
 };
 
 /* ═══════════════════════════════════════════
@@ -386,6 +412,11 @@ function alertCount() {
 }
 function safe(arr) { return Array.isArray(arr) ? arr : []; }
 function first(res) { const a = safe(res); return a[0] || null; }
+function pilotName(id) {
+  const p = S.pilots.find(p => p.id === id);
+  return p ? `${p.first_name} ${p.last_name}` : id;
+}
+
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 /* ═══════════════════════════════════════════
@@ -827,9 +858,20 @@ function renderPlanningTimeline() {
       const l = simPct(s.start_time), r = simPct(s.end_time);
       if (l===null||r===null) return '';
       const w = Math.max(r-l, 0.5);
+      const [sh,sm] = (s.start_time||'00:00').split(':').map(Number);
+      const [eh,em] = (s.end_time||'00:00').split(':').map(Number);
+      const durMin = (eh*60+em) - (sh*60+sm);
+      const durStr = durMin > 0 ? (durMin >= 60 ? `${Math.floor(durMin/60)}h${durMin%60>0?String(durMin%60).padStart(2,'0'):''}` : `${durMin}min`) : '';
+      const startLbl = (s.start_time||'').slice(0,5);
+      const endLbl = (s.end_time||'').slice(0,5);
       return `<div class="tl-block" style="left:${l}%;width:${w}%;background:#7C3AED"
+        onmouseenter="showTip('tip-${s.id}',event,'${esc(s.client_name||'Sim')}','${startLbl}→${endLbl}${durStr?' · '+durStr:''}')"
+        onmouseleave="hideTip()"
         onclick="event.stopPropagation();openEditSim('${s.id}')">
-        <div class="tl-block-label">${esc(s.client_name||'Sim')}</div>
+        <div style="min-width:0">
+          <div class="tl-block-label">${esc(s.client_name||'Sim')}</div>
+          ${w > 6 ? `<div class="tl-block-sub">${startLbl}${durStr?' · '+durStr:''}</div>` : ''}
+        </div>
       </div>`;
     }).join('') : '';
 
@@ -853,10 +895,13 @@ function renderPlanningTimeline() {
   function pilotRow(pilot) {
     const unavailKey = `${pilot.id}:${dateStr}`;
     const isUnavail = !!S.pilotUnavail[unavailKey];
+    const paraClub = S.pilotPara[unavailKey] || null;
+    const isPara = !!paraClub;
+    const isBlocked = isUnavail || isPara;
     const pilotFlights = dayFlights.filter(f => f.pilot_id === pilot.id);
     const pilotSims = daySims.filter(s => s.handler_id === pilot.id);
 
-    const blocks = isUnavail ? '' : [
+    const blocks = isBlocked ? '' : [
       ...pilotFlights.map(f => {
         const l = pct(f.departure_time), r = pct(f.arrival_time);
         if (l===null||r===null) return '';
@@ -870,30 +915,73 @@ function renderPlanningTimeline() {
         const l = simPct(s.start_time), r = simPct(s.end_time);
         if (l===null||r===null) return '';
         const w = Math.max(r-l, 0.5);
+        const [sh,sm] = (s.start_time||'00:00').split(':').map(Number);
+        const [eh,em] = (s.end_time||'00:00').split(':').map(Number);
+        const durMin = (eh*60+em) - (sh*60+sm);
+        const durStr = durMin > 0 ? (durMin >= 60 ? `${Math.floor(durMin/60)}h${durMin%60>0?String(durMin%60).padStart(2,'0'):''}` : `${durMin}min`) : '';
+        const startLbl = (s.start_time||'').slice(0,5);
         return `<div class="tl-block" style="left:${l}%;width:${w}%;background:#7C3AED" onclick="event.stopPropagation();openEditSim('${s.id}')">
-          <div class="tl-block-label">${esc(s.client_name||'Sim')}</div>
+          <div style="min-width:0">
+            <div class="tl-block-label">${esc(s.client_name||'Sim')}</div>
+            ${w > 6 ? `<div class="tl-block-sub">${startLbl}${durStr?' · '+durStr:''}</div>` : ''}
+          </div>
         </div>`;
       })
     ].join('');
 
-    const unavailBadge = isUnavail ? `<div class="tl-unavail-badge">INDISPO</div>` : '';
-    const unavailBtn = `<button onclick="event.stopPropagation();togglePilotUnavail('${pilot.id}','${dateStr}')"
-      style="margin-top:3px;font-size:10px;background:${isUnavail?'#FEF2F2':'transparent'};border:1px solid ${isUnavail?'var(--red)':'var(--border)'};color:${isUnavail?'var(--red)':'var(--t3)'};border-radius:4px;padding:1px 6px;cursor:pointer;font-family:'DM Sans',sans-serif">
-      ${isUnavail?'✓ Indispo':'Marquer indispo'}
-    </button>`;
+    const roleLabel = pilot.role === 'chief_pilot' ? 'Chef pilote' : pilot.role === 'instructeur_simulateur' ? 'Instr. Sim.' : 'Pilote';
 
-    const trackContent = isUnavail
-      ? `<div class="tl-unavail-block"><span class="tl-unavail-label">INDISPONIBLE</span></div>`
-      : (blocks || '<div class="tl-empty-track">+ Ajouter</div>');
+    const dossierBadge = pilot.role === 'instructeur_simulateur' ? (() => {
+      const { pct } = dossierCompletion(pilot.id);
+      const ready = isDispatchReady(pilot.id);
+      return `<div onclick="event.stopPropagation();openDossierPilot('${pilot.id}')"
+        style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;background:${ready?'var(--green-p)':'var(--amber-p)'};border:1px solid ${ready?'var(--green)':'var(--amber)'};border-radius:4px;padding:1px 6px;margin-top:2px;font-size:10px;font-weight:600;color:${ready?'var(--green)':'var(--amber)'}">
+        ${ready?'✅':'⚠️'} Formation ${pct}%
+      </div>`;
+    })() : '';
 
-    return `<div class="tl-row${isUnavail?' unavailable':''}">
+    let statusBadge = '';
+    let statusBtn = '';
+    if (isPara) {
+      statusBadge = `<div class="tl-para-badge">🪂 ${esc(paraClub)}</div>`;
+      statusBtn = `<button onclick="event.stopPropagation();clearPilotStatus('${pilot.id}','${dateStr}')"
+        style="margin-top:3px;font-size:10px;background:#FFFBEB;border:1px solid var(--amber);color:var(--amber);border-radius:4px;padding:1px 6px;cursor:pointer;font-family:'DM Sans',sans-serif">
+        ✕ Effacer
+      </button>`;
+    } else if (isUnavail) {
+      statusBadge = `<div class="tl-unavail-badge">INDISPO</div>`;
+      statusBtn = `<button onclick="event.stopPropagation();clearPilotStatus('${pilot.id}','${dateStr}')"
+        style="margin-top:3px;font-size:10px;background:#FEF2F2;border:1px solid var(--red);color:var(--red);border-radius:4px;padding:1px 6px;cursor:pointer;font-family:'DM Sans',sans-serif">
+        ✕ Effacer
+      </button>`;
+    } else {
+      statusBtn = `<button onclick="event.stopPropagation();openPilotStatusModal('${pilot.id}','${dateStr}')"
+        style="margin-top:3px;font-size:10px;background:transparent;border:1px solid var(--border);color:var(--t3);border-radius:4px;padding:1px 6px;cursor:pointer;font-family:'DM Sans',sans-serif">
+        + Indispo / PARA
+      </button>`;
+    }
+
+    let trackContent;
+    if (isPara) {
+      trackContent = `<div class="tl-para-block"><span class="tl-para-icon">🪂</span><span class="tl-para-label">${esc(paraClub)}</span></div>`;
+    } else if (isUnavail) {
+      trackContent = `<div class="tl-unavail-block"><span class="tl-unavail-label">INDISPONIBLE</span></div>`;
+    } else {
+      trackContent = blocks || '<div class="tl-empty-track">+ Ajouter</div>';
+    }
+
+    const rowClass = isPara ? 'tl-row para' : isUnavail ? 'tl-row unavailable' : 'tl-row';
+    const trackAttr = isBlocked ? 'style="cursor:not-allowed"' : `onclick="openTLAddPilot(event,'${pilot.id}','${esc(pilot.first_name+' '+pilot.last_name)}','${dateStr}')"`;
+
+    return `<div class="${rowClass}">
       <div class="tl-row-label tl-res-col">
         <div class="tl-row-name">${esc(pilot.first_name+' '+pilot.last_name)}</div>
-        <div class="tl-row-sub">${esc(pilot.role==='chief_pilot'?'Chef pilote':pilot.role||'Pilote')}</div>
-        ${unavailBadge}
-        ${unavailBtn}
+        <div class="tl-row-sub">${roleLabel}</div>
+        ${dossierBadge}
+        ${statusBadge}
+        ${statusBtn}
       </div>
-      <div class="tl-track${isUnavail?' unavailable':''}" ${isUnavail?'style="cursor:not-allowed"':'onclick="openTLAddPilot(event,\''+pilot.id+'\',\''+esc(pilot.first_name+' '+pilot.last_name)+'\',\''+dateStr+'\')"'}>
+      <div class="tl-track" ${trackAttr}>
         ${bgLines.join('')}
         ${isToday && nowPct!==null ? `<div class="tl-now-line" style="left:${nowPct}%"><div class="tl-now-dot"></div></div>` : ''}
         ${trackContent}
@@ -927,6 +1015,7 @@ function renderPlanningTimeline() {
     <div class="tl-legend-item"><div class="tl-legend-dot" style="background:#DC2626"></div>AOG</div>
     <div class="tl-legend-item"><div class="tl-legend-dot" style="background:#059669"></div>Released OFP</div>
     <div class="tl-legend-item"><div style="width:12px;height:12px;border-radius:3px;background:repeating-linear-gradient(45deg,#e5e7eb,#e5e7eb 2px,#d1d5db 2px,#d1d5db 4px);flex-shrink:0"></div>Indisponible</div>
+    <div class="tl-legend-item"><div style="width:12px;height:12px;border-radius:3px;background:linear-gradient(135deg,#F59E0B,#D97706);flex-shrink:0"></div>Dépl. PARA</div>
     ${isToday ? '<div class="tl-legend-item"><div class="tl-legend-dot" style="background:var(--red);border-radius:50%"></div>Maintenant</div>' : ''}
   </div>
 
@@ -988,19 +1077,76 @@ function hideTip() {
   if (t) t.style.display = 'none';
 }
 
-/* ── TOGGLE PILOT UNAVAILABILITY ── */
-function togglePilotUnavail(pilotId, dateStr) {
+/* ── PILOT STATUS MODAL (Indispo / PARA) ── */
+function openPilotStatusModal(pilotId, dateStr) {
+  openModal('Statut du pilote', `
+    <div style="margin-bottom:16px;font-size:14px;color:var(--t2)">Choisissez le statut pour <strong style="color:var(--navy)">${esc(pilotName(pilotId))}</strong> le ${dateStr}</div>
+    <div class="ev-type-grid" style="margin-bottom:20px">
+      <button class="ev-type-btn" onclick="setPilotUnavail('${pilotId}','${dateStr}')">
+        <div class="ev-type-icon">🚫</div>
+        <div class="ev-type-name">Indisponible</div>
+        <div class="ev-type-sub">Repos, médical, perso…</div>
+      </button>
+      <button class="ev-type-btn" onclick="showParaForm('${pilotId}','${dateStr}')">
+        <div class="ev-type-icon">🪂</div>
+        <div class="ev-type-name">Déplacement PARA</div>
+        <div class="ev-type-sub">Mission en centre de saut</div>
+      </button>
+    </div>
+    <div id="para-club-form" style="display:none">
+      <div class="field">
+        <label>Nom du club / centre PARA</label>
+        <input id="para-club-input" placeholder="ex : Aéroclub de Brest, Drop Zone Nord…">
+      </div>
+      <div class="m-foot">
+        <button class="btn-g" onclick="closeModal()">Annuler</button>
+        <button class="btn" onclick="setPilotPara('${pilotId}','${dateStr}')">Confirmer</button>
+      </div>
+    </div>
+    <div class="m-foot" id="indispo-foot">
+      <button class="btn-g" onclick="closeModal()">Annuler</button>
+    </div>
+  `);
+}
+
+function showParaForm(pilotId, dateStr) {
+  document.querySelectorAll('.ev-type-btn').forEach(b => b.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+  document.getElementById('para-club-form').style.display = 'block';
+  document.getElementById('indispo-foot').style.display = 'none';
+  setTimeout(() => document.getElementById('para-club-input')?.focus(), 50);
+}
+
+function setPilotUnavail(pilotId, dateStr) {
   const key = `${pilotId}:${dateStr}`;
-  if (S.pilotUnavail[key]) {
-    delete S.pilotUnavail[key];
-  } else {
-    const hasFlights = S.flights.some(f => f.pilot_id === pilotId && f.departure_time?.startsWith(dateStr));
-    const hasSims = S.sims.some(s => s.handler_id === pilotId && s.date === dateStr);
-    if (hasFlights || hasSims) {
-      if (!confirm('Ce pilote a des événements ce jour. Marquer quand même comme indisponible ?')) return;
-    }
-    S.pilotUnavail[key] = true;
+  const hasFlights = S.flights.some(f => f.pilot_id === pilotId && f.departure_time?.startsWith(dateStr));
+  const hasSims = S.sims.some(s => s.handler_id === pilotId && s.date === dateStr);
+  if (hasFlights || hasSims) {
+    if (!confirm('Ce pilote a des événements ce jour. Marquer quand même comme indisponible ?')) return;
   }
+  S.pilotUnavail[key] = true;
+  delete S.pilotPara[key];
+  localStorage.setItem('hove_pilotPara', JSON.stringify(S.pilotPara));
+  closeModal();
+  renderPlanningTimeline();
+}
+
+function setPilotPara(pilotId, dateStr) {
+  const club = document.getElementById('para-club-input')?.value?.trim();
+  if (!club) return alert('Nom du club requis');
+  const key = `${pilotId}:${dateStr}`;
+  S.pilotPara[key] = club;
+  delete S.pilotUnavail[key];
+  localStorage.setItem('hove_pilotPara', JSON.stringify(S.pilotPara));
+  closeModal();
+  renderPlanningTimeline();
+}
+
+function clearPilotStatus(pilotId, dateStr) {
+  const key = `${pilotId}:${dateStr}`;
+  delete S.pilotUnavail[key];
+  delete S.pilotPara[key];
+  localStorage.setItem('hove_pilotPara', JSON.stringify(S.pilotPara));
   renderPlanningTimeline();
 }
 
@@ -1246,6 +1392,15 @@ async function saveTLPilotSim(pilotId, dateStr) {
   const stime = document.getElementById('tl-stime')?.value;
   const etime = document.getElementById('tl-etime')?.value;
   if (!client||!stime||!etime) return alert('Client et horaires requis');
+
+  // Formation check
+  const handler = S.pilots.find(p => p.id === pilotId);
+  if (handler?.role === 'instructeur_simulateur' && !isDispatchReady(pilotId)) {
+    const { done, total } = dossierCompletion(pilotId);
+    const force = confirm(`⚠️ Formation incomplète — ${handler.first_name} ${handler.last_name}\n${done}/${total} éléments validés\n\nDispatcher quand même ?`);
+    if (!force) return;
+  }
+
   const sim = S.aircraft.find(a => a.type==='simulator');
   const d = {date:dateStr, start_time:stime, end_time:etime, client_name:client,
     session_type:document.getElementById('tl-stype')?.value||'', handler_id:pilotId, simulator_id:sim?.id||null};
@@ -1343,6 +1498,18 @@ async function saveSim(id) {
   const sim = S.aircraft.find(a => a.type==='simulator');
   const d = { date: val('s-da'), start_time: val('s-st'), end_time: val('s-et'), client_name: val('s-cn'), client_origin: val('s-co'), session_type: val('s-ty'), amount: val('s-am') ? parseFloat(val('s-am')) : null, handler_id: val('s-ha') || null, notes: val('s-no'), simulator_id: sim?.id || null };
   if (!d.client_name||!d.start_time||!d.end_time) return alert('Champs obligatoires manquants');
+
+  // ── Formation check for instructeur simulateur
+  if (d.handler_id) {
+    const handler = S.pilots.find(p => p.id === d.handler_id);
+    if (handler?.role === 'instructeur_simulateur' && !isDispatchReady(d.handler_id)) {
+      const name = `${handler.first_name} ${handler.last_name}`;
+      const { done, total } = dossierCompletion(d.handler_id);
+      const force = confirm(`⚠️ Formation incomplète — ${name}\n${done}/${total} éléments validés\n\nL'évaluation finale n'a pas été validée.\nDispatcher quand même sur simulateur ?`);
+      if (!force) return;
+    }
+  }
+
   if (id) {
     const r = await db.patch('simulator_sessions', id, d);
     const u = first(r)||{...S.sims.find(s=>s.id===id),...d};
@@ -1453,13 +1620,16 @@ function renderCrew() {
             <div class="crew-h">
               <div>
                 <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:20px;color:var(--navy)">${esc(p.first_name)} ${esc(p.last_name)}</div>
-                <div style="font-size:13px;color:var(--t2);margin-top:3px">
-                  ${p.role==='chief_pilot'?'Chef Pilote':'Pilote'}
-                  ${p.email?` · ${esc(p.email)}`:''}
-                  ${p.phone?` · ${esc(p.phone)}`:''}
+                <div style="font-size:13px;color:var(--t2);margin-top:3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  ${p.role==='chief_pilot' ? '<span class="badge" style="background:var(--navy-pale);color:var(--navy)">Chef Pilote</span>' :
+                    p.role==='instructeur_simulateur' ? '<span class="badge" style="background:#EDE9FE;color:#5B21B6">🎓 Instr. Simulateur</span>' :
+                    '<span class="badge" style="background:var(--green-p);color:var(--green)">Pilote</span>'}
+                  ${p.email?`<span>${esc(p.email)}</span>`:''}
+                  ${p.phone?`<span>${esc(p.phone)}</span>`:''}
                 </div>
               </div>
               <div class="li-actions">
+                ${p.role==='instructeur_simulateur' ? `<button class="sim-instr-btn" onclick="openDossierPilot('${p.id}')">📋 Dossier formation</button>` : ''}
                 <button class="btn-g btn-sm" onclick="openEditPilot('${p.id}')">Modifier</button>
                 <button class="btn-d" onclick="deletePilot('${p.id}')">Supprimer</button>
               </div>
@@ -1501,8 +1671,9 @@ function pilotForm(p={}) {
       <div class="field"><label>Nom *</label><input id="p-ln" value="${esc(p.last_name||'')}"></div>
     </div>
     <div class="field"><label>Rôle</label><select id="p-ro">
-      <option value="pilot" ${p.role!=='chief_pilot'?'selected':''}>Pilote</option>
+      <option value="pilot" ${p.role==='pilot'||(!p.role&&p.role!=='chief_pilot'&&p.role!=='instructeur_simulateur')?'selected':''}>Pilote</option>
       <option value="chief_pilot" ${p.role==='chief_pilot'?'selected':''}>Chef Pilote</option>
+      <option value="instructeur_simulateur" ${p.role==='instructeur_simulateur'?'selected':''}>Instructeur Simulateur</option>
     </select></div>
     <div class="field"><label>Email</label><input type="email" id="p-em" value="${esc(p.email||'')}"></div>
     <div class="field"><label>Téléphone</label><input id="p-ph" value="${esc(p.phone||'')}"></div>
@@ -1534,6 +1705,147 @@ async function deletePilot(id) {
   await db.del('pilots', id);
   S.pilots = S.pilots.filter(p => p.id !== id);
   renderCrew();
+}
+
+/* ═══════════════════════════════════════════
+   DOSSIER FORMATION — INSTRUCTEUR SIMULATEUR
+═══════════════════════════════════════════ */
+const DOSSIER_ITEMS = [
+  { bloc: '🖥️ Bloc 1 — Technique simulateur (30 min)', items: [
+    { key: 'b1_interface',      label: 'Navigation dans l\'interface : menus, sélection aéroport, météo, heure' },
+    { key: 'b1_scenarios',      label: 'Chargement et paramétrage des scénarios (initiation, cross-country, ILS, Mayday)' },
+    { key: 'b1_realisme',       label: 'Réglage du niveau de réalisme selon profil client' },
+    { key: 'b1_inject',         label: 'Positionnement en vol (inject) et sélection de piste' },
+    { key: 'b1_startup',        label: 'Procédure de démarrage et d\'arrêt complète du simulateur' },
+    { key: 'b1_reset',          label: 'Sauvegarde et reset entre deux clients' },
+    { key: 'b1_calib',          label: 'Recalibrage manches/pédales en cas de dérive' },
+    { key: 'b1_pannes',         label: 'Gestion des incidents techniques (freeze, réseau, plantage logiciel)' },
+    { key: 'b1_diff',           label: 'Différence pilote / instructeur simulateur : désapprendre ses automatismes' },
+  ]},
+  { bloc: '👥 Bloc 2 — Pédagogie client (45 min)', items: [
+    { key: 'b2_struct',         label: 'Structure d\'une session type : accueil → briefing → sim → débrief → closing' },
+    { key: 'b2_grand_public',   label: 'Profil grand public / famille : encouragements, vocabulaire adapté' },
+    { key: 'b2_phobique',       label: 'Profil phobique : ton calme, rythme lent, pas de scénario stressant sans accord' },
+    { key: 'b2_passionné',      label: 'Profil passionné / simmer : laisser l\'initiative, rester guide sans brider' },
+    { key: 'b2_cadeau',         label: 'Profil cadeau (non demandeur) : créer l\'envie dès l\'accueil' },
+    { key: 'b2_corporate',      label: 'Profil corporate / groupe : animation dynamique, esprit challenge' },
+    { key: 'b2_pro',            label: 'Profil pro / sélections : rigueur procédurale, feedback direct' },
+    { key: 'b2_phobique_rules', label: 'Règles impératives phobique : ne jamais déclencher alarme sans accord, savoir stopper' },
+    { key: 'b2_delicate',       label: 'Gestion des situations délicates : client mécontent, incident technique, enfant anxieux' },
+  ]},
+  { bloc: '💼 Bloc 3 — Offre & image de marque (15 min)', items: [
+    { key: 'b3_offre',          label: 'Connaissance de l\'offre complète : Découverte, Pilote, Mayday, Pro, Corporate' },
+    { key: 'b3_tarifs',         label: 'Maîtrise des tarifs et conditions' },
+    { key: 'b3_discours',       label: 'Présentation valeur avant prix, réponse à "c\'est cher ?"' },
+    { key: 'b3_cadeau_closing', label: 'Proposition systématique de bon cadeau en closing' },
+    { key: 'b3_marque',         label: 'Règles image de marque : tenue, langage, smartphone, remontée incidents' },
+    { key: 'b3_avis',           label: 'Process avis Google : QR code, timing, formulation' },
+  ]},
+  { bloc: '✅ Évaluation finale (30 min)', items: [
+    { key: 'eval_done',         label: 'Session supervisée complète réalisée avec évaluateur' },
+    { key: 'eval_validated',    label: 'Score ≥ 6/8 critères validés (dont gestion incident + adaptation profil obligatoires)' },
+    { key: 'eval_signed',       label: 'Fiche d\'évaluation signée par évaluateur et instructeur' },
+  ]},
+];
+
+function getDossier(pilotId) {
+  return S.pilotDossiers[pilotId] || {};
+}
+
+function saveDossier(pilotId, checks) {
+  S.pilotDossiers[pilotId] = checks;
+  localStorage.setItem('hove_pilotDossiers', JSON.stringify(S.pilotDossiers));
+}
+
+function dossierCompletion(pilotId) {
+  const checks = getDossier(pilotId);
+  const total = DOSSIER_ITEMS.reduce((n, b) => n + b.items.length, 0);
+  const done = DOSSIER_ITEMS.reduce((n, b) => n + b.items.filter(i => checks[i.key]).length, 0);
+  return { done, total, pct: total ? Math.round(done/total*100) : 0 };
+}
+
+function isDispatchReady(pilotId) {
+  // Must have all eval items checked
+  const checks = getDossier(pilotId);
+  return DOSSIER_ITEMS[3].items.every(i => checks[i.key]);
+}
+
+function toggleDossierItem(pilotId, key) {
+  const checks = getDossier(pilotId);
+  checks[key] = !checks[key];
+  saveDossier(pilotId, checks);
+  // Re-render dossier in place
+  const p = S.pilots.find(p => p.id === pilotId);
+  if (p) openDossierPilot(pilotId);
+}
+
+function openDossierPilot(pilotId) {
+  const p = S.pilots.find(p => p.id === pilotId);
+  if (!p) return;
+  const checks = getDossier(pilotId);
+  const { done, total, pct } = dossierCompletion(pilotId);
+  const ready = isDispatchReady(pilotId);
+  const name = `${p.first_name} ${p.last_name}`;
+
+  const statusBanner = ready
+    ? `<div style="background:var(--green-p);border:1.5px solid var(--green);border-radius:10px;padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">✅</span>
+        <div><div style="font-weight:700;color:var(--green);font-size:14px">Formation validée — Dispatch simulateur autorisé</div>
+        <div style="font-size:12px;color:var(--green);opacity:.8">Tous les critères d'évaluation sont remplis</div></div>
+      </div>`
+    : `<div style="background:var(--amber-p);border:1.5px solid var(--amber);border-radius:10px;padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">⚠️</span>
+        <div><div style="font-weight:700;color:var(--amber);font-size:14px">Formation incomplète — Dispatch simulateur bloqué</div>
+        <div style="font-size:12px;color:var(--amber);opacity:.8">L'évaluation finale doit être validée avant tout dispatch</div></div>
+      </div>`;
+
+  const progressBar = `
+    <div style="margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:13px;font-weight:600;color:var(--t2)">Progression globale</span>
+        <span style="font-size:13px;font-weight:700;color:${pct===100?'var(--green)':'var(--navy)'}">${done}/${total} — ${pct}%</span>
+      </div>
+      <div class="dossier-progress">
+        <div class="dossier-progress-bar" style="width:${pct}%;background:${pct===100?'var(--green)':'var(--amber)'}"></div>
+      </div>
+    </div>`;
+
+  const blocsHTML = DOSSIER_ITEMS.map((bloc, bi) => {
+    const blocDone = bloc.items.filter(i => checks[i.key]).length;
+    const blocTotal = bloc.items.length;
+    const allDone = blocDone === blocTotal;
+    return `
+      <div class="dossier-bloc">
+        <div class="dossier-bloc-head">
+          <span class="dossier-bloc-title">${bloc.bloc}</span>
+          <span class="${allDone?'dossier-badge-ok':'dossier-badge-pending'}">${blocDone}/${blocTotal}</span>
+        </div>
+        <div class="dossier-bloc-body">
+          ${bloc.items.map(item => `
+            <div class="dossier-item" onclick="toggleDossierItem('${pilotId}','${item.key}')">
+              <div class="dossier-check ${checks[item.key]?'done':''}">${checks[item.key]?'✓':''}</div>
+              <div class="dossier-item-text ${checks[item.key]?'done':''}">${esc(item.label)}</div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }).join('');
+
+  openModal(`📋 Dossier — ${name}`, `
+    ${statusBanner}
+    ${progressBar}
+    ${blocsHTML}
+    <div class="m-foot" style="margin-top:8px">
+      <button class="btn-g" onclick="closeModal()">Fermer</button>
+      ${!ready ? `<button class="btn" style="background:var(--amber)" onclick="confirmDispatchOverride('${pilotId}','${name}')">Dispatcher quand même</button>` : ''}
+    </div>
+  `);
+}
+
+function confirmDispatchOverride(pilotId, name) {
+  if (confirm(`⚠️ La formation de ${name} n'est pas validée.\n\nDispatcher sur simulateur quand même ?\n(Cette action sera notée dans votre historique)`)) {
+    closeModal();
+    alert(`Dispatch forcé pour ${name}. Pensez à finaliser la formation dès que possible.`);
+  }
 }
 
 function licForm(pilotId, l={}) {
