@@ -356,6 +356,7 @@ const S = {
   ofpStep: 1, ofpData: {}, ofpMap: null, ofpTab: 'new',
   pilotUnavail: migratePilotUnavail(), // { 'pilotId:YYYY-MM-DD': {start:'HH:MM', end:'HH:MM', reason:'...'} }
   pilotDossiers: JSON.parse(localStorage.getItem('hove_pilotDossiers') || '{}'), // { pilotId: { item_key: true } }
+  flyhoveFleet: [], flyhoveTab: 'liste', flyhoveFilters: {},
 };
 
 /* ═══════════════════════════════════════════
@@ -445,6 +446,7 @@ const PAGES = [
   { id: 'dashboard', label: 'Dashboard', icon: iconGrid() },
   { id: 'planning',  label: 'Planning',  icon: iconCal() },
   { id: 'flotte',   label: 'Flotte',    icon: iconPlane() },
+  { id: 'flyhove',  label: 'flyHOVE',   icon: iconFlyhove() },
   { id: 'crew',     label: 'Crew',      icon: iconUsers() },
   { id: 'compliance',label: 'Compliance',icon: iconShield() },
   { id: 'formulaires',label: 'Formulaires',icon: iconDoc() },
@@ -487,6 +489,7 @@ function renderPage() {
     dashboard: renderDashboard,
     planning: renderPlanning,
     flotte: renderFlotte,
+    flyhove: renderFlyhove,
     crew: renderCrew,
     compliance: renderCompliance,
     formulaires: renderFormulaires,
@@ -502,7 +505,7 @@ async function loadAll() {
   S.loading = true;
   renderPage();
   try {
-    const [p,a,f,ss,l,d,m,sg,fo] = await Promise.all([
+    const [p,a,f,ss,l,d,m,sg,fo,fh] = await Promise.all([
       db.get('pilots','order=created_at.asc'),
       db.get('aircraft','order=created_at.asc'),
       db.get('flights','order=departure_time.desc'),
@@ -512,9 +515,11 @@ async function loadAll() {
       db.get('manex_documents','order=created_at.desc'),
       db.get('manex_signatures','order=signed_at.desc'),
       db.get('hove_forms','order=submitted_at.desc').catch(()=>[]),
+      db.get('flyhove_fleet','order=created_at.asc').catch(()=>[]),
     ]);
     S.pilots=safe(p); S.aircraft=safe(a); S.flights=safe(f); S.sims=safe(ss);
     S.licenses=safe(l); S.derogations=safe(d); S.manex=safe(m); S.signatures=safe(sg); S.forms=safe(fo);
+    S.flyhoveFleet=safe(fh);
     S.synced = true;
   } catch(e) { S.synced = false; }
   S.loading = false;
@@ -1595,6 +1600,150 @@ async function deleteAc(id) {
 }
 
 /* ═══════════════════════════════════════════
+   PAGE: FLYHOVE FLEET (catalogue coque nue, usage interne)
+═══════════════════════════════════════════ */
+function renderFlyhove() {
+  const c = document.getElementById('content');
+  const tabHtml = `
+    <div class="tabs">
+      <button class="tab ${S.flyhoveTab==='liste'?'on':''}" onclick="S.flyhoveTab='liste';renderFlyhove()">Flotte</button>
+      <button class="tab ${S.flyhoveTab==='recherche'?'on':''}" onclick="S.flyhoveTab='recherche';renderFlyhove()">Recherche</button>
+    </div>`;
+  c.innerHTML = `
+    <div class="ph">
+      <div><h1>flyHOVE</h1><div class="pg-sub">Catalogue de flotte flyHOVE — usage interne</div></div>
+      ${S.flyhoveTab==='liste' ? '<button class="btn" onclick="openNewFlyhoveAc()">+ Ajouter un appareil</button>' : ''}
+    </div>
+    ${tabHtml}
+    <div id="flyhove-body"></div>
+  `;
+  if (S.flyhoveTab === 'recherche') renderFlyhoveRecherche();
+  else renderFlyhoveListe();
+}
+
+function flyhoveCard(a) {
+  return `
+    <div class="li">
+      <div>
+        <div class="li-title">${esc(a.name)}</div>
+        <div class="li-sub">${esc(a.registration||'—')} · ${esc(a.location||'localisation non renseignée')}</div>
+        <div style="font-size:13px;color:var(--t3);margin-top:2px">
+          ${a.seats?a.seats+' sièges':''}${a.seats&&a.range_nm?' · ':''}${a.range_nm?a.range_nm+' Nm autonomie':''}${(a.seats||a.range_nm)&&a.price_hour?' · ':''}${a.price_hour?a.price_hour+' €/h':''}
+        </div>
+      </div>
+      <div class="li-actions">
+        <button class="btn-g btn-sm" onclick="openEditFlyhoveAc('${a.id}')">Modifier</button>
+        <button class="btn-d" onclick="deleteFlyhoveAc('${a.id}')">Supprimer</button>
+      </div>
+    </div>`;
+}
+
+function renderFlyhoveListe() {
+  const body = document.getElementById('flyhove-body');
+  if (!body) return;
+  body.innerHTML = S.flyhoveFleet.length === 0
+    ? '<div class="empty">Aucun appareil flyHOVE enregistré</div>'
+    : S.flyhoveFleet.map(flyhoveCard).join('');
+}
+
+function flyhoveForm(a={}) {
+  return `
+    <div class="field"><label>Nom / Modèle *</label><input id="fh-na" value="${esc(a.name||'')}" placeholder="Cirrus SR22 G7+"></div>
+    <div class="field"><label>Immatriculation</label><input id="fh-re" value="${esc(a.registration||'')}" placeholder="F-HXXX"></div>
+    <div class="g2">
+      <div class="field"><label>Nombre de sièges</label><input id="fh-se" type="number" value="${a.seats||''}" placeholder="5"></div>
+      <div class="field"><label>Autonomie (Nm)</label><input id="fh-ra" type="number" value="${a.range_nm||''}" placeholder="1000"></div>
+    </div>
+    <div class="g2">
+      <div class="field"><label>Localisation</label><input id="fh-lo" value="${esc(a.location||'')}" placeholder="LFQT — Merville-Calonne"></div>
+      <div class="field"><label>Prix à l'heure (€)</label><input id="fh-pr" type="number" value="${a.price_hour||''}" placeholder="350"></div>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="fh-no" placeholder="Équipements, disponibilité, contact propriétaire…">${esc(a.notes||'')}</textarea></div>
+    <div class="m-foot">
+      <button class="btn-g" onclick="closeModal()">Annuler</button>
+      <button class="btn" onclick="saveFlyhoveAc(${a.id?`'${a.id}'`:'null'})">Enregistrer</button>
+    </div>`;
+}
+
+function openNewFlyhoveAc() { openModal('Nouvel appareil flyHOVE', flyhoveForm()); }
+function openEditFlyhoveAc(id) { const a = S.flyhoveFleet.find(a => a.id===id); if(a) openModal('Modifier', flyhoveForm(a)); }
+
+async function saveFlyhoveAc(id) {
+  const d = {
+    name: val('fh-na'), registration: val('fh-re'), location: val('fh-lo'), notes: val('fh-no'),
+    seats: parseInt(val('fh-se'))||null, range_nm: parseInt(val('fh-ra'))||null, price_hour: parseFloat(val('fh-pr'))||null,
+  };
+  if (!d.name) return alert('Nom requis');
+  try {
+    if (id) {
+      const r = await db.patch('flyhove_fleet', id, d);
+      const u = first(r)||{...S.flyhoveFleet.find(a=>a.id===id),...d};
+      S.flyhoveFleet = S.flyhoveFleet.map(a => a.id===id ? u : a);
+    } else {
+      const r = await db.post('flyhove_fleet', d);
+      const n = first(r); if(n) S.flyhoveFleet.push(n); else S.flyhoveFleet.push({...d, id:'local-'+Date.now()});
+    }
+  } catch(e) {
+    alert('Table "flyhove_fleet" introuvable sur Supabase — enregistré localement seulement pour cette session.');
+    if (id) S.flyhoveFleet = S.flyhoveFleet.map(a => a.id===id ? {...a,...d} : a);
+    else S.flyhoveFleet.push({...d, id:'local-'+Date.now()});
+  }
+  closeModal(); renderFlyhove();
+}
+
+async function deleteFlyhoveAc(id) {
+  if (!confirm('Supprimer cet appareil flyHOVE ?')) return;
+  try { await db.del('flyhove_fleet', id); } catch(e) {}
+  S.flyhoveFleet = S.flyhoveFleet.filter(a => a.id !== id);
+  renderFlyhove();
+}
+
+function renderFlyhoveRecherche() {
+  const body = document.getElementById('flyhove-body');
+  if (!body) return;
+  const f = S.flyhoveFilters;
+  body.innerHTML = `
+    <div class="card" style="margin-bottom:20px">
+      <span class="sec-label">Critères</span>
+      <div class="g2">
+        <div class="field"><label>Sièges min.</label><input id="fhs-seats" type="number" value="${f.seats||''}" oninput="applyFlyhoveFilters()" placeholder="ex: 4"></div>
+        <div class="field"><label>Autonomie min. (Nm)</label><input id="fhs-range" type="number" value="${f.range||''}" oninput="applyFlyhoveFilters()" placeholder="ex: 800"></div>
+      </div>
+      <div class="g2">
+        <div class="field"><label>Prix max. (€/h)</label><input id="fhs-price" type="number" value="${f.price||''}" oninput="applyFlyhoveFilters()" placeholder="ex: 400"></div>
+        <div class="field"><label>Localisation</label><input id="fhs-loc" value="${esc(f.loc||'')}" oninput="applyFlyhoveFilters()" placeholder="ex: LFQT, Merville…"></div>
+      </div>
+      <button class="btn-g" style="width:100%" onclick="S.flyhoveFilters={};renderFlyhove()">Réinitialiser les critères</button>
+    </div>
+    <span class="sec-label" id="fhs-count">${S.flyhoveFleet.length} appareil(s)</span>
+    <div id="fhs-results"></div>
+  `;
+  applyFlyhoveFilters();
+}
+
+function applyFlyhoveFilters() {
+  const seats = parseInt(document.getElementById('fhs-seats')?.value)||0;
+  const range = parseInt(document.getElementById('fhs-range')?.value)||0;
+  const price = parseFloat(document.getElementById('fhs-price')?.value)||0;
+  const loc = (document.getElementById('fhs-loc')?.value||'').trim().toLowerCase();
+  S.flyhoveFilters = { seats: seats||null, range: range||null, price: price||null, loc: loc||null };
+
+  const results = S.flyhoveFleet.filter(a =>
+    (!seats || (a.seats||0) >= seats) &&
+    (!range || (a.range_nm||0) >= range) &&
+    (!price || (a.price_hour||Infinity) <= price) &&
+    (!loc || (a.location||'').toLowerCase().includes(loc))
+  );
+
+  const countEl = document.getElementById('fhs-count');
+  if (countEl) countEl.textContent = `${results.length} appareil(s) correspondant(s)`;
+  const resEl = document.getElementById('fhs-results');
+  if (resEl) resEl.innerHTML = results.length === 0
+    ? '<div class="empty">Aucun appareil ne correspond à ces critères</div>'
+    : results.map(flyhoveCard).join('');
+}
+
+/* ═══════════════════════════════════════════
    PAGE: CREW
 ═══════════════════════════════════════════ */
 const LIC_TYPES = ['MEP','SEP','IRME','CRM','CLASSE_1'];
@@ -2416,6 +2565,7 @@ function iconUsers() { return `<svg width="18" height="18" viewBox="0 0 24 24" f
 function iconShield() { return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>`; }
 function iconOFP() { return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 8.81a19.79 19.79 0 01-3.07-8.68A2 2 0 012 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 14.92z"/></svg>`; }
 function iconDoc() { return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>`; }
+function iconFlyhove() { return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`; }
 
 
 /* ═══════════════════════════════════════════
