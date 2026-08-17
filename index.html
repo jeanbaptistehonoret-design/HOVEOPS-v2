@@ -195,12 +195,6 @@ h1{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--navy
 .tl-unavail-block{position:absolute;inset:4px;background:repeating-linear-gradient(45deg,rgba(0,0,0,.04),rgba(0,0,0,.04) 4px,rgba(0,0,0,.08) 4px,rgba(0,0,0,.08) 8px);border-radius:4px;display:flex;align-items:center;justify-content:center}
 .tl-unavail-label{font-size:11px;font-weight:700;color:var(--t3);letter-spacing:.5px}
 
-/* PARA DEPLOYMENT */
-.tl-row.para .tl-row-name{color:var(--amber)}
-.tl-para-badge{display:inline-block;background:#FFFBEB;border:1px solid var(--amber);color:var(--amber);border-radius:4px;font-size:10px;font-weight:600;padding:1px 6px;margin-top:2px;letter-spacing:.3px}
-.tl-para-block{position:absolute;inset:3px;background:linear-gradient(135deg,#F59E0B,#D97706);border-radius:6px;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 10px;box-shadow:0 1px 4px rgba(245,158,11,.3)}
-.tl-para-icon{font-size:14px}
-.tl-para-label{font-size:11px;font-weight:700;color:#fff;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* DOSSIER */
 .dossier-progress{height:6px;background:var(--border);border-radius:3px;margin:8px 0 4px;overflow:hidden}
@@ -360,8 +354,7 @@ const S = {
   planDate: todayStr(), planView: 'calendar', planTab: 'vols', compTab: 'derog', formTab: 'fr',
   forms: [],
   ofpStep: 1, ofpData: {}, ofpMap: null, ofpTab: 'new',
-  pilotUnavail: {}, // { 'pilotId:YYYY-MM-DD': true }
-  pilotPara: JSON.parse(localStorage.getItem('hove_pilotPara') || '{}'), // { 'pilotId:YYYY-MM-DD': 'Club name' }
+  pilotUnavail: migratePilotUnavail(), // { 'pilotId:YYYY-MM-DD': {start:'HH:MM', end:'HH:MM', reason:'...'} }
   pilotDossiers: JSON.parse(localStorage.getItem('hove_pilotDossiers') || '{}'), // { pilotId: { item_key: true } }
 };
 
@@ -372,6 +365,19 @@ function todayStr() {
   const n = new Date();
   return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
 }
+function migratePilotUnavail() {
+  // New unified model: { 'pilotId:date': {start,end,reason} }, persisted under hove_pilotUnavail.
+  // One-time migration from the old separate boolean + PARA-club models, if present.
+  const current = JSON.parse(localStorage.getItem('hove_pilotUnavail') || '{}');
+  const oldPara = JSON.parse(localStorage.getItem('hove_pilotPara') || '{}');
+  let changed = false;
+  Object.keys(oldPara).forEach(key => {
+    if (!current[key]) { current[key] = { start:'00:00', end:'23:59', reason: 'Déplacement PARA — ' + oldPara[key] }; changed = true; }
+  });
+  if (changed) { localStorage.setItem('hove_pilotUnavail', JSON.stringify(current)); localStorage.removeItem('hove_pilotPara'); }
+  return current;
+}
+function savePilotUnavail() { localStorage.setItem('hove_pilotUnavail', JSON.stringify(S.pilotUnavail)); }
 function fmtDate(d) {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('fr-FR', {day:'2-digit', month:'short', year:'numeric'});
@@ -894,14 +900,13 @@ function renderPlanningTimeline() {
 
   function pilotRow(pilot) {
     const unavailKey = `${pilot.id}:${dateStr}`;
-    const isUnavail = !!S.pilotUnavail[unavailKey];
-    const paraClub = S.pilotPara[unavailKey] || null;
-    const isPara = !!paraClub;
-    const isBlocked = isUnavail || isPara;
+    const unavail = S.pilotUnavail[unavailKey] || null;
+    const isUnavail = !!unavail;
+    const isFullDay = isUnavail && unavail.start <= '00:00' && unavail.end >= '23:59';
     const pilotFlights = dayFlights.filter(f => f.pilot_id === pilot.id);
     const pilotSims = daySims.filter(s => s.handler_id === pilot.id);
 
-    const blocks = isBlocked ? '' : [
+    const blocks = isFullDay ? '' : [
       ...pilotFlights.map(f => {
         const l = pct(f.departure_time), r = pct(f.arrival_time);
         if (l===null||r===null) return '';
@@ -926,7 +931,20 @@ function renderPlanningTimeline() {
             ${w > 6 ? `<div class="tl-block-sub">${startLbl}${durStr?' · '+durStr:''}</div>` : ''}
           </div>
         </div>`;
-      })
+      }),
+      ...(isUnavail && !isFullDay ? [(() => {
+        const [sh,sm] = unavail.start.split(':').map(Number);
+        const [eh,em] = unavail.end.split(':').map(Number);
+        const l = Math.max(0, Math.min(100, (sh+sm/60 - TL_START) / TL_HOURS * 100));
+        const r = Math.max(0, Math.min(100, (eh+em/60 - TL_START) / TL_HOURS * 100));
+        const w = Math.max(r-l, 0.5);
+        return `<div class="tl-block tl-unavail-block" style="left:${l}%;width:${w}%"
+          onmouseenter="showTip('tip-unavail-${pilot.id}',event,'Indisponible','${esc(unavail.start+'→'+unavail.end+(unavail.reason?' · '+unavail.reason:''))}')"
+          onmouseleave="hideTip()"
+          onclick="event.stopPropagation();openPilotStatusModal('${pilot.id}','${dateStr}')">
+          <span class="tl-unavail-label">${esc(unavail.reason || 'Indisponible')}</span>
+        </div>`;
+      })()] : [])
     ].join('');
 
     const roleLabel = pilot.role === 'chief_pilot' ? 'Chef pilote' : pilot.role === 'instructeur_simulateur' ? 'Instr. Sim.' : 'Pilote';
@@ -942,36 +960,25 @@ function renderPlanningTimeline() {
 
     let statusBadge = '';
     let statusBtn = '';
-    if (isPara) {
-      statusBadge = `<div class="tl-para-badge">🪂 ${esc(paraClub)}</div>`;
-      statusBtn = `<button onclick="event.stopPropagation();clearPilotStatus('${pilot.id}','${dateStr}')"
-        style="margin-top:3px;font-size:10px;background:#FFFBEB;border:1px solid var(--amber);color:var(--amber);border-radius:4px;padding:1px 6px;cursor:pointer;font-family:'DM Sans',sans-serif">
-        ✕ Effacer
-      </button>`;
-    } else if (isUnavail) {
-      statusBadge = `<div class="tl-unavail-badge">INDISPO</div>`;
-      statusBtn = `<button onclick="event.stopPropagation();clearPilotStatus('${pilot.id}','${dateStr}')"
+    if (isUnavail) {
+      statusBadge = `<div class="tl-unavail-badge">${isFullDay?'INDISPO JOURNÉE':esc(unavail.start+'–'+unavail.end)}</div>`;
+      statusBtn = `<button onclick="event.stopPropagation();openPilotStatusModal('${pilot.id}','${dateStr}')"
         style="margin-top:3px;font-size:10px;background:#FEF2F2;border:1px solid var(--red);color:var(--red);border-radius:4px;padding:1px 6px;cursor:pointer;font-family:'DM Sans',sans-serif">
-        ✕ Effacer
+        ✎ ${esc(unavail.reason||'Modifier')}
       </button>`;
     } else {
       statusBtn = `<button onclick="event.stopPropagation();openPilotStatusModal('${pilot.id}','${dateStr}')"
         style="margin-top:3px;font-size:10px;background:transparent;border:1px solid var(--border);color:var(--t3);border-radius:4px;padding:1px 6px;cursor:pointer;font-family:'DM Sans',sans-serif">
-        + Indispo / PARA
+        + Indispo
       </button>`;
     }
 
-    let trackContent;
-    if (isPara) {
-      trackContent = `<div class="tl-para-block"><span class="tl-para-icon">🪂</span><span class="tl-para-label">${esc(paraClub)}</span></div>`;
-    } else if (isUnavail) {
-      trackContent = `<div class="tl-unavail-block"><span class="tl-unavail-label">INDISPONIBLE</span></div>`;
-    } else {
-      trackContent = blocks || '<div class="tl-empty-track">+ Ajouter</div>';
-    }
+    const trackContent = isFullDay
+      ? `<div class="tl-unavail-block" style="left:0;width:100%" onclick="event.stopPropagation();openPilotStatusModal('${pilot.id}','${dateStr}')"><span class="tl-unavail-label">${esc(unavail.reason || 'Indisponible — journée')}</span></div>`
+      : (blocks || '<div class="tl-empty-track">+ Ajouter</div>');
 
-    const rowClass = isPara ? 'tl-row para' : isUnavail ? 'tl-row unavailable' : 'tl-row';
-    const trackAttr = isBlocked ? 'style="cursor:not-allowed"' : `onclick="openTLAddPilot(event,'${pilot.id}','${esc(pilot.first_name+' '+pilot.last_name)}','${dateStr}')"`;
+    const rowClass = isFullDay ? 'tl-row unavailable' : 'tl-row';
+    const trackAttr = isFullDay ? '' : `onclick="openTLAddPilot(event,'${pilot.id}','${esc(pilot.first_name+' '+pilot.last_name)}','${dateStr}')"`;
 
     return `<div class="${rowClass}">
       <div class="tl-row-label tl-res-col">
@@ -1014,8 +1021,7 @@ function renderPlanningTimeline() {
     <div class="tl-legend-item"><div class="tl-legend-dot" style="background:#D97706"></div>Maintenance / Convoyage</div>
     <div class="tl-legend-item"><div class="tl-legend-dot" style="background:#DC2626"></div>AOG</div>
     <div class="tl-legend-item"><div class="tl-legend-dot" style="background:#059669"></div>Released OFP</div>
-    <div class="tl-legend-item"><div style="width:12px;height:12px;border-radius:3px;background:repeating-linear-gradient(45deg,#e5e7eb,#e5e7eb 2px,#d1d5db 2px,#d1d5db 4px);flex-shrink:0"></div>Indisponible</div>
-    <div class="tl-legend-item"><div style="width:12px;height:12px;border-radius:3px;background:linear-gradient(135deg,#F59E0B,#D97706);flex-shrink:0"></div>Dépl. PARA</div>
+    <div class="tl-legend-item"><div style="width:12px;height:12px;border-radius:3px;background:repeating-linear-gradient(45deg,#e5e7eb,#e5e7eb 2px,#d1d5db 2px,#d1d5db 4px);flex-shrink:0"></div>Indisponible (avec raison)</div>
     ${isToday ? '<div class="tl-legend-item"><div class="tl-legend-dot" style="background:var(--red);border-radius:50%"></div>Maintenant</div>' : ''}
   </div>
 
@@ -1077,67 +1083,50 @@ function hideTip() {
   if (t) t.style.display = 'none';
 }
 
-/* ── PILOT STATUS MODAL (Indispo / PARA) ── */
-function openPilotStatusModal(pilotId, dateStr) {
-  openModal('Statut du pilote', `
-    <div style="margin-bottom:16px;font-size:14px;color:var(--t2)">Choisissez le statut pour <strong style="color:var(--navy)">${esc(pilotName(pilotId))}</strong> le ${dateStr}</div>
-    <div class="ev-type-grid" style="margin-bottom:20px">
-      <button class="ev-type-btn" onclick="setPilotUnavail('${pilotId}','${dateStr}')">
-        <div class="ev-type-icon">🚫</div>
-        <div class="ev-type-name">Indisponible</div>
-        <div class="ev-type-sub">Repos, médical, perso…</div>
-      </button>
-      <button class="ev-type-btn" onclick="showParaForm('${pilotId}','${dateStr}')">
-        <div class="ev-type-icon">🪂</div>
-        <div class="ev-type-name">Déplacement PARA</div>
-        <div class="ev-type-sub">Mission en centre de saut</div>
-      </button>
+/* ── PILOT STATUS MODAL (Indispo avec plage horaire + raison) ── */
+const UNAVAIL_PRESETS = ['Repos', 'Médical', 'Personnel', 'Déplacement PARA', 'Autre'];
+
+function openPilotStatusModal(pilotId, dateStr, defaultStart, defaultEnd) {
+  const existing = S.pilotUnavail[`${pilotId}:${dateStr}`];
+  const start = existing?.start || defaultStart || '00:00';
+  const end = existing?.end || defaultEnd || '23:59';
+  const reason = existing?.reason || '';
+  const matchedPreset = UNAVAIL_PRESETS.find(p => reason.startsWith(p)) || '';
+
+  openModal('Indisponibilité pilote', `
+    <div style="margin-bottom:16px;font-size:14px;color:var(--t2)">Pour <strong style="color:var(--navy)">${esc(pilotName(pilotId))}</strong> le ${dateStr}</div>
+    <div class="g2">
+      <div class="field"><label>Début *</label><input type="time" id="unavail-start" value="${start}"></div>
+      <div class="field"><label>Fin *</label><input type="time" id="unavail-end" value="${end}"></div>
     </div>
-    <div id="para-club-form" style="display:none">
-      <div class="field">
-        <label>Nom du club / centre PARA</label>
-        <input id="para-club-input" placeholder="ex : Aéroclub de Brest, Drop Zone Nord…">
+    <div class="field">
+      <label>Raison</label>
+      <div class="row" style="margin-bottom:8px">
+        ${UNAVAIL_PRESETS.map(p => `<button type="button" class="btn-g btn-sm" style="${matchedPreset===p?'border-color:var(--navy);color:var(--navy)':''}" onclick="document.getElementById('unavail-reason').value='${p}'">${p}</button>`).join('')}
       </div>
-      <div class="m-foot">
-        <button class="btn-g" onclick="closeModal()">Annuler</button>
-        <button class="btn" onclick="setPilotPara('${pilotId}','${dateStr}')">Confirmer</button>
-      </div>
+      <input id="unavail-reason" placeholder="ex : Repos — retour de mission, RDV médical…" value="${esc(reason)}">
     </div>
-    <div class="m-foot" id="indispo-foot">
+    <div class="m-foot">
       <button class="btn-g" onclick="closeModal()">Annuler</button>
+      ${existing ? `<button class="btn-d" onclick="clearPilotStatus('${pilotId}','${dateStr}')">Supprimer</button>` : ''}
+      <button class="btn" onclick="setPilotUnavail('${pilotId}','${dateStr}')">Enregistrer</button>
     </div>
   `);
 }
 
-function showParaForm(pilotId, dateStr) {
-  document.querySelectorAll('.ev-type-btn').forEach(b => b.classList.remove('selected'));
-  event.currentTarget.classList.add('selected');
-  document.getElementById('para-club-form').style.display = 'block';
-  document.getElementById('indispo-foot').style.display = 'none';
-  setTimeout(() => document.getElementById('para-club-input')?.focus(), 50);
-}
-
 function setPilotUnavail(pilotId, dateStr) {
+  const start = document.getElementById('unavail-start')?.value || '00:00';
+  const end = document.getElementById('unavail-end')?.value || '23:59';
+  const reason = document.getElementById('unavail-reason')?.value?.trim() || '';
+  if (start >= end) return alert('L\'heure de fin doit être après l\'heure de début');
   const key = `${pilotId}:${dateStr}`;
   const hasFlights = S.flights.some(f => f.pilot_id === pilotId && f.departure_time?.startsWith(dateStr));
   const hasSims = S.sims.some(s => s.handler_id === pilotId && s.date === dateStr);
   if (hasFlights || hasSims) {
-    if (!confirm('Ce pilote a des événements ce jour. Marquer quand même comme indisponible ?')) return;
+    if (!confirm('Ce pilote a des événements ce jour. Marquer quand même comme indisponible sur ce créneau ?')) return;
   }
-  S.pilotUnavail[key] = true;
-  delete S.pilotPara[key];
-  localStorage.setItem('hove_pilotPara', JSON.stringify(S.pilotPara));
-  closeModal();
-  renderPlanningTimeline();
-}
-
-function setPilotPara(pilotId, dateStr) {
-  const club = document.getElementById('para-club-input')?.value?.trim();
-  if (!club) return alert('Nom du club requis');
-  const key = `${pilotId}:${dateStr}`;
-  S.pilotPara[key] = club;
-  delete S.pilotUnavail[key];
-  localStorage.setItem('hove_pilotPara', JSON.stringify(S.pilotPara));
+  S.pilotUnavail[key] = { start, end, reason };
+  savePilotUnavail();
   closeModal();
   renderPlanningTimeline();
 }
@@ -1145,8 +1134,8 @@ function setPilotPara(pilotId, dateStr) {
 function clearPilotStatus(pilotId, dateStr) {
   const key = `${pilotId}:${dateStr}`;
   delete S.pilotUnavail[key];
-  delete S.pilotPara[key];
-  localStorage.setItem('hove_pilotPara', JSON.stringify(S.pilotPara));
+  savePilotUnavail();
+  closeModal();
   renderPlanningTimeline();
 }
 
@@ -1310,7 +1299,7 @@ function openTLAddPilot(event, pilotId, pilotFullName, dateStr) {
   const defaultEnd = `${dateStr}T${String(Math.min(23,Math.floor(clickH)+1)).padStart(2,'0')}:${mm}`;
 
   openModal(`Ajouter pour ${pilotFullName}`, `
-    <div class="ev-type-grid" style="grid-template-columns:1fr 1fr">
+    <div class="ev-type-grid" style="grid-template-columns:1fr 1fr 1fr">
       <button class="ev-type-btn" onclick="selectPilotEventType(this,'vol','${pilotId}','${dateStr}','${defaultTime}','${defaultEnd}')">
         <div class="ev-type-icon">✈️</div>
         <div class="ev-type-name">Vol</div>
@@ -1320,6 +1309,11 @@ function openTLAddPilot(event, pilotId, pilotFullName, dateStr) {
         <div class="ev-type-icon">🖥️</div>
         <div class="ev-type-name">Simulateur</div>
         <div class="ev-type-sub">Session sim</div>
+      </button>
+      <button class="ev-type-btn" onclick="closeModal();openPilotStatusModal('${pilotId}','${dateStr}','${defaultTime.split('T')[1]}','${defaultEnd.split('T')[1]}')">
+        <div class="ev-type-icon">🚫</div>
+        <div class="ev-type-name">Indispo</div>
+        <div class="ev-type-sub">Repos, médical…</div>
       </button>
     </div>
     <div id="tl-pilot-form" style="margin-top:8px"></div>
