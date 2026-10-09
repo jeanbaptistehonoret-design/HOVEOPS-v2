@@ -642,6 +642,83 @@ function xInvoicePdf(id) {
 const XP = { coprop: xRenderCoprop, dispatch: xRenderDispatch, frat: xRenderFrat, duty: xRenderDuty, maint: xRenderMaint, factu: xRenderFactu };
 const _xRender = renderPage;
 renderPage = function () { if (!S.loading && XP[S.page]) return XP[S.page](); return _xRender(); };
-(function () { const st = document.createElement('style'); st.textContent = '#bnav{overflow-x:auto}.bnb{min-width:64px;flex:0 0 auto}#snav{overflow-y:auto}'; document.head.appendChild(st); })();
+
+/* ═══════════════════════════════════════════
+   MENU REGROUPÉ — accordéon (bureau) / panneau (mobile)
+═══════════════════════════════════════════ */
+(function () {
+  const st = document.createElement('style');
+  st.textContent = `#snav{overflow-y:auto}
+.xgh.xga{color:var(--navy);font-weight:600}
+.xchev{margin-left:auto;font-size:11px;color:var(--t3);transition:transform .15s}.xchev.o{transform:rotate(180deg)}
+.xsub{display:none;margin:0 0 6px 20px;padding-left:10px;border-left:2px solid var(--border)}.xsub.open{display:block}
+.xsb{display:block;width:100%;text-align:left;padding:7px 10px;border:none;border-radius:8px;background:transparent;color:var(--t2);font:400 13px 'DM Sans',sans-serif;cursor:pointer;margin-bottom:1px}
+.xsb:hover{background:var(--bg);color:var(--navy)}.xsb.on{background:var(--navy-pale);color:var(--navy);font-weight:600}
+#xsheet{position:fixed;inset:0;z-index:99}.xsh-bg{position:absolute;inset:0;background:rgba(10,15,30,.35)}
+.xsh-card{position:absolute;left:10px;right:10px;bottom:72px;background:var(--white);border-radius:14px;border:1px solid var(--border);box-shadow:var(--shadow);padding:10px;max-height:60vh;overflow-y:auto}
+.xsh-t{font:800 13px 'Syne',sans-serif;color:var(--navy);padding:6px 10px;text-transform:uppercase;letter-spacing:.5px}
+.xsh-b{display:block;width:100%;text-align:left;padding:12px 10px;border:none;border-radius:8px;background:transparent;color:var(--text);font:500 15px 'DM Sans',sans-serif;cursor:pointer}
+.xsh-b.on{background:var(--navy-pale);color:var(--navy);font-weight:700}
+@media(min-width:769px){#xsheet{display:none}}`;
+  document.head.appendChild(st);
+})();
+const xIcoEuro = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>';
+const xTab = (k, v) => () => { XS[k] = v; };
+const xTabS = (k, v) => () => { S[k] = v; };
+const XNAV = [
+  { id: 'dashboard', label: 'Dashboard', short: 'Accueil', icon: iconGrid(), page: 'dashboard' },
+  { id: 'ops', label: 'Opérations', short: 'Opér.', icon: iconCal(), items: [
+    { l: 'Planning', p: 'planning' }, { l: 'Dispatch (missions)', p: 'dispatch' }, { l: 'OFP', p: 'ofp' }] },
+  { id: 'copro', label: 'Copropriétaires', short: 'Copro.', icon: iconUsers(), items: [
+    { l: 'Registre & contrats', p: 'coprop', pre: xTab('co', 'reg'), on: () => XS.co === 'reg' },
+    { l: 'Jours de pointe', p: 'coprop', pre: xTab('co', 'peak'), on: () => XS.co === 'peak' }] },
+  { id: 'finance', label: 'Finance', short: 'Finance', icon: xIcoEuro, items: [
+    { l: 'Factures mensuelles', p: 'factu', pre: xTab('fa', 'inv'), on: () => XS.fa === 'inv' },
+    { l: 'Rapports d\'exploitation', p: 'factu', pre: xTab('fa', 'rep'), on: () => XS.fa === 'rep' }] },
+  { id: 'flotte', label: 'Flotte', short: 'Flotte', icon: iconPlane(), items: [
+    { l: 'Avions & simulateurs', p: 'flotte' }, { l: 'flyHOVE', p: 'flyhove' },
+    { l: 'Compteurs', p: 'maint', pre: xTab('mt', 'cnt'), on: () => XS.mt === 'cnt' },
+    { l: 'Inspections', p: 'maint', pre: xTab('mt', 'insp'), on: () => XS.mt === 'insp' },
+    { l: 'Anomalies & MEL', p: 'maint', pre: xTab('mt', 'sq'), on: () => XS.mt === 'sq' }] },
+  { id: 'crew', label: 'Équipage', short: 'Équipage', icon: iconUsers(), items: [
+    { l: 'Crew & licences', p: 'crew' }, { l: 'Temps de service', p: 'duty' }] },
+  { id: 'safety', label: 'Sécurité', short: 'Sécu.', icon: iconShield(), items: [
+    { l: 'FRAT', p: 'frat', pre: xTab('fr', 'frat'), on: () => XS.fr === 'frat' },
+    { l: 'Registre SMS', p: 'frat', pre: xTab('fr', 'sms'), on: () => XS.fr === 'sms' },
+    { l: 'Dérogations IFR', p: 'compliance', pre: xTabS('compTab', 'derog'), on: () => S.compTab === 'derog' },
+    { l: 'MANEX', p: 'compliance', pre: xTabS('compTab', 'manex'), on: () => S.compTab === 'manex' },
+    { l: 'Formulaires', p: 'formulaires' }] },
+];
+const xActive = it => S.page === it.p && (!it.on || it.on());
+const xGroupActive = g => g.page ? S.page === g.page : g.items.some(xActive);
+function xToggle(id) { XS.open = XS.open === id ? '' : id; buildNav(); }
+function xSheet(id) { XS.sheet = XS.sheet === id ? '' : id; buildNav(); }
+function xNavGo(gid, i) {
+  const g = XNAV.find(x => x.id === gid); if (!g) return;
+  XS.sheet = '';
+  if (i === undefined) return goTo(g.page);
+  const it = g.items[i]; if (it.pre) it.pre(); XS.open = g.id; goTo(it.p);
+}
+buildNav = function () {
+  const snav = document.getElementById('snav'), bnav = document.getElementById('bnav'); if (!snav || !bnav) return;
+  const cnt = alertCount();
+  if (XS.open === undefined) { const a = XNAV.find(xGroupActive); XS.open = a && !a.page ? a.id : ''; }
+  snav.innerHTML = XNAV.map(g => {
+    const ga = xGroupActive(g);
+    if (g.page) return `<button class="nb ${ga ? 'on' : ''}" onclick="xNavGo('${g.id}')">${g.icon} ${esc(g.label)}${g.id === 'dashboard' && cnt > 0 ? `<span class="nb-badge" style="display:inline">${cnt}</span>` : ''}</button>`;
+    const open = XS.open === g.id;
+    return `<button class="nb xgh ${ga ? 'xga' : ''}" onclick="xToggle('${g.id}')">${g.icon} ${esc(g.label)}<span class="xchev ${open ? 'o' : ''}">▾</span></button>
+      <div class="xsub ${open ? 'open' : ''}">${g.items.map((it, i) => `<button class="xsb ${xActive(it) ? 'on' : ''}" onclick="xNavGo('${g.id}',${i})">${esc(it.l)}</button>`).join('')}</div>`;
+  }).join('');
+  bnav.innerHTML = XNAV.map(g => `<button class="bnb ${xGroupActive(g) || XS.sheet === g.id ? 'on' : ''}" onclick="${g.page ? `xNavGo('${g.id}')` : `xSheet('${g.id}')`}">${g.icon} ${esc(g.short || g.label)}</button>`).join('');
+  const old = document.getElementById('xsheet'); if (old) old.remove();
+  const sg = XNAV.find(x => x.id === XS.sheet);
+  if (sg && sg.items) {
+    const sh = document.createElement('div'); sh.id = 'xsheet';
+    sh.innerHTML = `<div class="xsh-bg" onclick="XS.sheet='';buildNav()"></div><div class="xsh-card"><div class="xsh-t">${esc(sg.label)}</div>${sg.items.map((it, i) => `<button class="xsh-b ${xActive(it) ? 'on' : ''}" onclick="xNavGo('${sg.id}',${i})">${esc(it.l)}</button>`).join('')}</div>`;
+    document.body.appendChild(sh);
+  }
+  const dot = document.getElementById('dot'); if (dot) dot.className = S.synced ? '' : 'err';
+};
 buildNav();
 xLoad();
